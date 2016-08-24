@@ -35,64 +35,72 @@ var (
 		},
 	)
 	// Backend_query_time_nsec : This seems per-thread and it does not make sense to export for a monitoring client.
-	Client_Connections_aborted = prometheus.NewCounter(
-		prometheus.CounterOpts{
+	Client_Connections_aborted = prometheus.NewGauge(
+		prometheus.GaugeOpts{
 			Name:      "Client_Connections_aborted",
 			Subsystem: "",
 			Help:      "Client_Connections_aborted from SHOW MYSQL STATUS",
 			Namespace: namespace,
 		},
 	)
-	Client_Connections_connected = prometheus.NewCounter(
-		prometheus.CounterOpts{
+	Client_Connections_connected = prometheus.NewGauge(
+		prometheus.GaugeOpts{
 			Name:      "Client_Connections_connected",
 			Subsystem: "",
 			Help:      "Client_Connections_connected from SHOW MYSQL STATUS",
 			Namespace: namespace,
 		},
 	)
-	Com_autocommit = prometheus.NewCounter(
-		prometheus.CounterOpts{
+	Client_Connections_created = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name:      "Client_Connections_created",
+			Subsystem: "",
+			Help:      "Client_Connections_created from SHOW MYSQL STATUS",
+			Namespace: namespace,
+		},
+	)
+	Com_autocommit = prometheus.NewGauge(
+		prometheus.GaugeOpts{
 			Name:      "Com_autocommit",
 			Subsystem: "",
 			Help:      "Com_autocommit from SHOW MYSQL STATUS",
 			Namespace: namespace,
 		},
 	)
-	Com_autocommit_filtered = prometheus.NewCounter(
-		prometheus.CounterOpts{
+	Com_autocommit_filtered = prometheus.NewGauge(
+		prometheus.GaugeOpts{
 			Name:      "Com_autocommit_filtered",
 			Subsystem: "",
 			Help:      "Com_autocommit_filtered from SHOW MYSQL STATUS",
 			Namespace: namespace,
 		},
 	)
-	Com_commit = prometheus.NewCounter(
-		prometheus.CounterOpts{
+	Com_commit = prometheus.NewGauge(
+		prometheus.GaugeOpts{
 			Name:      "Com_commit",
 			Subsystem: "",
 			Help:      "Com_commit from SHOW MYSQL STATUS",
 			Namespace: namespace,
 		},
 	)
-	Com_commit_filtered = prometheus.NewCounter(
-		prometheus.CounterOpts{
+	Com_commit_filtered = prometheus.NewGauge(
+		prometheus.GaugeOpts{
 			Name:      "Com_commit_filtered",
 			Subsystem: "",
 			Help:      "Com_commit_filtered from SHOW MYSQL STATUS",
 			Namespace: namespace,
 		},
 	)
-	Com_rollback = prometheus.NewCounter(
-		prometheus.CounterOpts{
+	Com_rollback = prometheus.NewGauge(
+		prometheus.GaugeOpts{
 			Name:      "Com_rollback",
 			Subsystem: "",
 			Help:      "Com_rollback from SHOW MYSQL STATUS",
 			Namespace: namespace,
 		},
 	)
-	Com_rollback_filtered = prometheus.NewCounter(
-		prometheus.CounterOpts{
+	Com_rollback_filtered = prometheus.NewGauge(
+		prometheus.GaugeOpts{
 			Name:      "Com_rollback_filtered",
 			Subsystem: "",
 			Help:      "Com_rollback_filtered from SHOW MYSQL STATUS",
@@ -123,16 +131,16 @@ var (
 			Namespace: namespace,
 		},
 	)
-	Queries_backends_bytes_recv = prometheus.NewCounter(
-		prometheus.CounterOpts{
+	Queries_backends_bytes_recv = prometheus.NewGauge(
+		prometheus.GaugeOpts{
 			Name:      "Queries_backends_bytes_recv",
 			Subsystem: "",
 			Help:      "Queries_backends_bytes_recv from SHOW MYSQL STATUS",
 			Namespace: namespace,
 		},
 	)
-	Queries_backends_bytes_sent = prometheus.NewCounter(
-		prometheus.CounterOpts{
+	Queries_backends_bytes_sent = prometheus.NewGauge(
+		prometheus.GaugeOpts{
 			Name:      "Queries_backends_bytes_sent",
 			Subsystem: "",
 			Help:      "Queries_backends_bytes_sent from SHOW MYSQL STATUS",
@@ -140,8 +148,8 @@ var (
 		},
 	)
 	// Query_Processor_time_nsec not included for the same reason as Backend_query_time_nsec
-	Questions = prometheus.NewCounter(
-		prometheus.CounterOpts{
+	Questions = prometheus.NewGauge(
+		prometheus.GaugeOpts{
 			Name:      "Questions",
 			Subsystem: "",
 			Help:      "Questions from SHOW MYSQL STATUS",
@@ -156,24 +164,24 @@ var (
 			Namespace: namespace,
 		},
 	)
-	Server_Connections_aborted = prometheus.NewCounter(
-		prometheus.CounterOpts{
+	Server_Connections_aborted = prometheus.NewGauge(
+		prometheus.GaugeOpts{
 			Name:      "Server_Connections_aborted",
 			Subsystem: "",
 			Help:      "Server_Connections_aborted from SHOW MYSQL STATUS",
 			Namespace: namespace,
 		},
 	)
-	Server_Connections_connected = prometheus.NewCounter(
-		prometheus.CounterOpts{
+	Server_Connections_connected = prometheus.NewGauge(
+		prometheus.GaugeOpts{
 			Name:      "Server_Connections_connected",
 			Subsystem: "",
 			Help:      "Server_Connections_connected from SHOW MYSQL STATUS",
 			Namespace: namespace,
 		},
 	)
-	Server_Connections_created = prometheus.NewCounter(
-		prometheus.CounterOpts{
+	Server_Connections_created = prometheus.NewGauge(
+		prometheus.GaugeOpts{
 			Name:      "Server_Connections_created",
 			Subsystem: "",
 			Help:      "Server_Connections_created from SHOW MYSQL STATUS",
@@ -181,8 +189,8 @@ var (
 		},
 	)
 	// Servers_table_version
-	Slow_queries = prometheus.NewCounter(
-		prometheus.CounterOpts{
+	Slow_queries = prometheus.NewGauge(
+		prometheus.GaugeOpts{
 			Name:      "Slow_queries",
 			Subsystem: "",
 			Help:      "Slow_queries from SHOW MYSQL STATUS",
@@ -219,7 +227,7 @@ func scrapeShowMySQLStatus(db *sql.DB) {
 		defer rows.Close()
 		for rows.Next() {
 			var Variable_name string
-			var Value interface{}
+			var Value float64
 			err := rows.Scan(&Variable_name, &Value)
 			if err != nil {
 				fmt.Println(err)
@@ -228,7 +236,48 @@ func scrapeShowMySQLStatus(db *sql.DB) {
 			}
 			switch Variable_name {
 			case "Active_transactions":
-				Active_Transactions.Set(Value.(float64))
+				Active_Transactions.Set(Value)
+			case "Client_Connections_aborted":
+				Client_Connections_aborted.Set(Value)
+			case "Client_Connections_connected":
+				Client_Connections_connected.Set(Value)
+			case "Client_Connections_created":
+				Client_Connections_created.Set(Value)
+			case "Com_autocommit":
+				Com_autocommit.Set(Value)
+			case "Com_autocommit_filtered":
+				Com_autocommit_filtered.Set(Value)
+			case "Com_commit":
+				Com_commit.Set(Value)
+			case "Com_commit_filtered":
+				Com_commit_filtered.Set(Value)
+			case "Com_rollback":
+				Com_rollback.Set(Value)
+			case "Com_rollback_filtered":
+				Com_rollback_filtered.Set(Value)
+			case "ConnPool_memory_bytes":
+				ConPool_memory_bytes.Set(Value)
+			case "MySQL_Monitor_Workers":
+				MySQL_Monitor_Workers.Set(Value)
+			case "MySQL_Thread_Workers":
+				MySQL_Thread_Workers.Set(Value)
+			case "Queries_backends_bytes_recv":
+				Queries_backends_bytes_recv.Set(Value)
+			case "Queries_backends_bytes_sent":
+				Queries_backends_bytes_sent.Set(Value)
+			case "Questions":
+				Questions.Set(Value)
+			case "SQLite3_memory_bytes":
+				SQLite3_memory_bytes.Set(Value)
+			case "Server_Connections_aborted":
+				Server_Connections_aborted.Set(Value)
+			case "Server_Connections_connected":
+				Server_Connections_connected.Set(Value)
+			case "Server_Connections_created":
+				Server_Connections_created.Set(Value)
+			case "Slow_queries":
+				Slow_queries.Set(Value)
+
 			}
 		}
 		time.Sleep(time.Duration(scrape_millis) * time.Millisecond)
@@ -243,6 +292,26 @@ func init() {
 	flag.IntVar(&retry_millis, "retry_millis", 1000, "The number of milliseconds to wait before retrying after a database failure.")
 	flag.IntVar(&scrape_millis, "scrape_millis", 1000, "The number of milliseconds to wait between scraping runs. ")
 	prometheus.MustRegister(Active_Transactions)
+	prometheus.MustRegister(Client_Connections_aborted)
+	prometheus.MustRegister(Client_Connections_connected)
+	prometheus.MustRegister(Client_Connections_created)
+	prometheus.MustRegister(Com_autocommit)
+	prometheus.MustRegister(Com_autocommit_filtered)
+	prometheus.MustRegister(Com_commit)
+	prometheus.MustRegister(Com_commit_filtered)
+	prometheus.MustRegister(Com_rollback)
+	prometheus.MustRegister(Com_rollback_filtered)
+	prometheus.MustRegister(ConPool_memory_bytes)
+	prometheus.MustRegister(MySQL_Monitor_Workers)
+	prometheus.MustRegister(MySQL_Thread_Workers)
+	prometheus.MustRegister(Queries_backends_bytes_recv)
+	prometheus.MustRegister(Queries_backends_bytes_sent)
+	prometheus.MustRegister(Questions)
+	prometheus.MustRegister(SQLite3_memory_bytes)
+	prometheus.MustRegister(Server_Connections_aborted)
+	prometheus.MustRegister(Server_Connections_connected)
+	prometheus.MustRegister(Server_Connections_created)
+	prometheus.MustRegister(Slow_queries)
 }
 
 func main() {
