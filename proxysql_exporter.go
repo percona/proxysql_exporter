@@ -198,8 +198,76 @@ var (
 		},
 	)
 	// mysql_backend|frontend|session bytes seem per-thread
-
+	// next are from stats.stats_mysql_connection_pool
+	Stats_MySQL_Connection_Pool_ConnUsed = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "Stats_MySQL_Connection_Pool_ConnUsed",
+			Subsystem: "",
+			Help:      "stats.stats_mysql_connection_pool.ConnUsed",
+			Namespace: namespace,
+		}, []string{"hostgroup", "srv_host", "srv_port"},
+	)
+	Stats_MySQL_Connection_Pool_ConnFree = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "Stats_MySQL_Connection_Pool_ConnFree",
+			Subsystem: "",
+			Help:      "stats.stats_mysql_connection_pool.ConnFree",
+			Namespace: namespace,
+		}, []string{"hostgroup", "srv_host", "srv_port"},
+	)
+	Stats_MySQL_Connection_Pool_ConnOK = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "Stats_MySQL_Connection_Pool_ConnOK",
+			Subsystem: "",
+			Help:      "stats.stats_mysql_connection_pool.ConnOK",
+			Namespace: namespace,
+		}, []string{"hostgroup", "srv_host", "srv_port"},
+	)
+	Stats_MySQL_Connection_Pool_ConnERR = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "Stats_MySQL_Connection_Pool_ConnERR",
+			Subsystem: "",
+			Help:      "stats.stats_mysql_connection_pool.ConnERR",
+			Namespace: namespace,
+		}, []string{"hostgroup", "srv_host", "srv_port"},
+	)
+	Stats_MySQL_Connection_Pool_Queries = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "Stats_MySQL_Connection_Pool_Queries",
+			Subsystem: "",
+			Help:      "stats.stats_mysql_connection_pool.Queries",
+			Namespace: namespace,
+		}, []string{"hostgroup", "srv_host", "srv_port"},
+	)
+	Stats_MySQL_Connection_Pool_Bytes_data_sent = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "Stats_MySQL_Connection_Pool_Bytes_data_sent",
+			Subsystem: "",
+			Help:      "stats.stats_mysql_connection_pool.Bytes_data_sent",
+			Namespace: namespace,
+		}, []string{"hostgroup", "srv_host", "srv_port"},
+	)
+	Stats_MySQL_Connection_Pool_Bytes_data_recv = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "Stats_MySQL_Connection_Pool_Bytes_data_recv",
+			Subsystem: "",
+			Help:      "stats.stats_mysql_connection_pool.Bytes_data_recv",
+			Namespace: namespace,
+		}, []string{"hostgroup", "srv_host", "srv_port"},
+	)
+	Stats_MySQL_Connection_Pool_Latency_ms = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name:      "Stats_MySQL_Connection_Pool_Latency_ms",
+			Subsystem: "",
+			Help:      "stats.stats_mysql_connection_pool.Latency_ms",
+			Namespace: namespace,
+		}, []string{"hostgroup", "srv_host", "srv_port"},
+	)
 )
+
+func waitBeforeRetry() {
+	time.Sleep(time.Duration(retry_millis) * time.Millisecond)
+}
 
 // connectToAdmin will attempt to connect to the dsn, retrying indefinitely every retry_millis ms if there is an error
 func connectToAdmin() *sql.DB {
@@ -207,9 +275,85 @@ func connectToAdmin() *sql.DB {
 		db, err := sql.Open("mysql", dsn)
 		if err != nil {
 			fmt.Println(err)
-			time.Sleep(time.Duration(retry_millis) * time.Millisecond)
+			waitBeforeRetry()
 		} else {
 			return db
+		}
+	}
+}
+
+func scrapeStatsMySQLConnectionPool(db *sql.DB) {
+	for {
+		rows, err := db.Query("select * from stats.stats_mysql_connection_pool")
+		if err != nil {
+			fmt.Println(err)
+			waitBeforeRetry()
+			db.Close()
+			db = connectToAdmin()
+			continue
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var (
+				hostgroup       string
+				srv_host        string
+				srv_port        string
+				status          string
+				ConnUsed        float64
+				ConnFree        float64
+				ConnOK          float64
+				ConnERR         float64
+				Queries         float64
+				Bytes_data_sent float64
+				Bytes_data_recv float64
+				Latency_ms      float64
+			)
+			err := rows.Scan(&hostgroup, &srv_host, &srv_port, &status, &ConnUsed, &ConnFree, &ConnOK, &ConnERR, &Queries, &Bytes_data_sent, &Bytes_data_recv, &Latency_ms)
+			if err != nil {
+				fmt.Println(err)
+				waitBeforeRetry()
+				continue
+			}
+			Stats_MySQL_Connection_Pool_ConnUsed.With(prometheus.Labels{
+				"hostgroup": hostgroup,
+				"srv_host":  srv_host,
+				"srv_port":  srv_port,
+			}).Set(ConnUsed)
+			Stats_MySQL_Connection_Pool_ConnFree.With(prometheus.Labels{
+				"hostgroup": hostgroup,
+				"srv_host":  srv_host,
+				"srv_port":  srv_port,
+			}).Set(ConnFree)
+			Stats_MySQL_Connection_Pool_ConnOK.With(prometheus.Labels{
+				"hostgroup": hostgroup,
+				"srv_host":  srv_host,
+				"srv_port":  srv_port,
+			}).Set(ConnOK)
+			Stats_MySQL_Connection_Pool_ConnERR.With(prometheus.Labels{
+				"hostgroup": hostgroup,
+				"srv_host":  srv_host,
+				"srv_port":  srv_port,
+			}).Set(ConnERR)
+			Stats_MySQL_Connection_Pool_Queries.With(prometheus.Labels{
+				"hostgroup": hostgroup,
+				"srv_host":  srv_host,
+				"srv_port":  srv_port,
+			}).Set(Queries)
+			Stats_MySQL_Connection_Pool_Bytes_data_sent.With(prometheus.Labels{
+				"hostgroup": hostgroup,
+				"srv_host":  srv_host,
+				"srv_port":  srv_port,
+			}).Set(Bytes_data_sent)
+			Stats_MySQL_Connection_Pool_Bytes_data_recv.With(prometheus.Labels{
+				"hostgroup": hostgroup,
+				"srv_host":  srv_host,
+				"srv_port":  srv_port,
+			}).Set(Bytes_data_recv)
+			Stats_MySQL_Connection_Pool_Latency_ms.With(prometheus.Labels{
+				"hostgroup": hostgroup,
+				"srv_host":  srv_host,
+				"srv_port":  srv_port,
+			}).Set(Latency_ms)
 		}
 	}
 }
@@ -219,7 +363,7 @@ func scrapeShowMySQLStatus(db *sql.DB) {
 		rows, err := db.Query("SHOW MYSQL STATUS")
 		if err != nil {
 			fmt.Println(err)
-			time.Sleep(time.Duration(retry_millis) * time.Millisecond)
+			waitBeforeRetry()
 			db.Close()
 			db = connectToAdmin()
 			continue
@@ -231,7 +375,7 @@ func scrapeShowMySQLStatus(db *sql.DB) {
 			err := rows.Scan(&Variable_name, &Value)
 			if err != nil {
 				fmt.Println(err)
-				time.Sleep(time.Duration(retry_millis) * time.Millisecond)
+				waitBeforeRetry()
 				continue
 			}
 			switch Variable_name {
@@ -312,6 +456,14 @@ func init() {
 	prometheus.MustRegister(Server_Connections_connected)
 	prometheus.MustRegister(Server_Connections_created)
 	prometheus.MustRegister(Slow_queries)
+	prometheus.MustRegister(Stats_MySQL_Connection_Pool_ConnUsed)
+	prometheus.MustRegister(Stats_MySQL_Connection_Pool_ConnFree)
+	prometheus.MustRegister(Stats_MySQL_Connection_Pool_ConnOK)
+	prometheus.MustRegister(Stats_MySQL_Connection_Pool_ConnERR)
+	prometheus.MustRegister(Stats_MySQL_Connection_Pool_Queries)
+	prometheus.MustRegister(Stats_MySQL_Connection_Pool_Bytes_data_sent)
+	prometheus.MustRegister(Stats_MySQL_Connection_Pool_Bytes_data_recv)
+	prometheus.MustRegister(Stats_MySQL_Connection_Pool_Latency_ms)
 }
 
 func main() {
@@ -319,6 +471,7 @@ func main() {
 	db := connectToAdmin()
 	defer db.Close()
 	go scrapeShowMySQLStatus(db)
+	go scrapeStatsMySQLConnectionPool(db)
 	http.Handle("/metrics", prometheus.Handler())
 	http.ListenAndServe(addr, nil)
 }
