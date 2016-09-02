@@ -355,6 +355,7 @@ func scrapeStatsMySQLConnectionPool(db *sql.DB) {
 				"srv_port":  srv_port,
 			}).Set(Latency_ms)
 		}
+		time.Sleep(time.Duration(scrape_millis) * time.Millisecond)
 	}
 }
 
