@@ -432,7 +432,7 @@ func init() {
 	flag.StringVar(&addr, "listen-address", ":2314", "The address to listen on for HTTP requests.")
 	flag.StringVar(&user, "user", "admin", "The ProxySQL admin interface username.")
 	flag.StringVar(&password, "password", "admin", "The ProxySQL admin interface password.")
-	flag.StringVar(&dsn, "dsn", "localhost:6032/admin", "The dsn to use to connect to ProxySQL's admin interface.")
+	flag.StringVar(&dsn, "dsn", "admin:admin@tcp(localhost:6032)/admin", "The dsn to use to connect to ProxySQL's admin interface.")
 	flag.IntVar(&retry_millis, "retry_millis", 1000, "The number of milliseconds to wait before retrying after a database failure.")
 	flag.IntVar(&scrape_millis, "scrape_millis", 1000, "The number of milliseconds to wait between scraping runs. ")
 	prometheus.MustRegister(Active_Transactions)
