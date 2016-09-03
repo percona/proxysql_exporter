@@ -283,7 +283,8 @@ func connectToAdmin() *sql.DB {
 }
 
 func scrapeStatsMySQLConnectionPool(db *sql.DB) {
-	for {
+	ticker := time.NewTicker(time.Duration(scrape_millis) * time.Millisecond)
+	for _ = range ticker.C {
 		rows, err := db.Query("select * from stats.stats_mysql_connection_pool")
 		if err != nil {
 			fmt.Println(err)
@@ -355,12 +356,12 @@ func scrapeStatsMySQLConnectionPool(db *sql.DB) {
 				"srv_port":  srv_port,
 			}).Set(Latency_ms)
 		}
-		time.Sleep(time.Duration(scrape_millis) * time.Millisecond)
 	}
 }
 
 func scrapeShowMySQLStatus(db *sql.DB) {
-	for {
+	ticker := time.NewTicker(time.Duration(scrape_millis) * time.Millisecond)
+	for _ = range ticker.C {
 		rows, err := db.Query("SHOW MYSQL STATUS")
 		if err != nil {
 			fmt.Println(err)
@@ -425,7 +426,6 @@ func scrapeShowMySQLStatus(db *sql.DB) {
 
 			}
 		}
-		time.Sleep(time.Duration(scrape_millis) * time.Millisecond)
 	}
 }
 
