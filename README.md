@@ -2,13 +2,10 @@
 
 Prometheus exporter for [ProxySQL](https://github.com/sysown/proxysql) performance data.
 
-## Features
+## Collectors
 
- * Global status statistics from `stats.stats_mysql_global` (`SHOW MYSQL STATUS`)
- * Connection pool usage metrics from `stats.stats_mysql_connection_pool`
-
-Note, if you name your MySQL endpoint via `comment` field in `mysql_servers` table, it will be set to the label
-`endpoint` for all connection pool metrics. Otherwise, this label will be set to `hostname:port`.
+ * Global status metrics from `SHOW MYSQL STATUS`
+ * Connection pool usage statistics from `stats_mysql_connection_pool`
 
 ## Build
 
@@ -22,3 +19,6 @@ GOOS=linux go build proxysql_exporter.go
 export DATA_SOURCE_NAME="admin:admin@tcp(localhost:6032)/"
 ./proxysql_exporter
 ```
+
+Note, for some reason it does not work with "stats:stats" credentials despite you can run the queries executed by the
+exporter successfully using mysql cli (`Error 1045: no such table: global_variables`).

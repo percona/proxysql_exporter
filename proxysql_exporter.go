@@ -31,24 +31,21 @@ var (
 	)
 	collectMySQLStatus = flag.Bool(
 		"collect.mysql_status", true,
-		"Collect from stats.stats_mysql_global",
+		"Collect from SHOW MYSQL STATUS",
 	)
 	collectMySQLConnectionPool = flag.Bool(
 		"collect.mysql_connection_pool", true,
-		"Collect from stats.stats_mysql_connection_pool",
+		"Collect from stats_mysql_connection_pool",
 	)
 )
 
 const (
 	namespace                = "proxysql"
 	exporter                 = "exporter"
-	upQuery                  = "SELECT 1"
-	mysqlStatusQuery         = "SELECT Variable_Name, Variable_Value FROM stats.stats_mysql_global"
+	mysqlStatusQuery         = "SHOW MYSQL STATUS"
 	mysqlConnectionPoolQuery = `
-		SELECT hostgroup_id, hostname, port, comment, m.status, ConnUsed, ConnFree, ConnOK, ConnERR, Queries,
-		Bytes_data_sent, Bytes_data_recv, Latency_ms
-		FROM mysql_servers m JOIN stats.stats_mysql_connection_pool s
-		ON m.hostgroup_id=s.hostgroup AND m.hostname=s.srv_host AND m.port=s.srv_port
+		SELECT hostgroup, srv_host, srv_port, status, ConnUsed, ConnFree, ConnOK, ConnERR, Queries,
+		Bytes_data_sent, Bytes_data_recv, Latency_ms FROM stats_mysql_connection_pool
 	`
 )
 
@@ -63,7 +60,8 @@ var landingPage = []byte(`<html>
 
 type Exporter struct {
 	dsn             string
-	duration, error prometheus.Gauge
+	duration        prometheus.Gauge
+	error           prometheus.Gauge
 	totalScrapes    prometheus.Counter
 	scrapeErrors    *prometheus.CounterVec
 	proxysqlUP      prometheus.Gauge
@@ -149,14 +147,11 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 	}
 	defer db.Close()
 
-	isUpRows, err := db.Query(upQuery)
-	if err != nil {
+	if err = db.Ping(); err != nil {
 		log.Errorln("Error pinging ProxySQL:", err)
 		e.proxysqlUP.Set(0)
 		return
 	}
-	isUpRows.Close()
-
 	e.proxysqlUP.Set(1)
 
 	if *collectMySQLStatus {
@@ -173,7 +168,7 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 	}
 }
 
-// scrapeMySQLStatus collects from stats.stats_mysql_global (SHOW MYSQL STATUS).
+// scrapeMySQLStatus collects `SHOW MYSQL STATUS`.
 func scrapeMySQLStatus(db *sql.DB, ch chan<- prometheus.Metric) error {
 	rows, err := db.Query(mysqlStatusQuery)
 	if err != nil {
@@ -192,7 +187,8 @@ func scrapeMySQLStatus(db *sql.DB, ch chan<- prometheus.Metric) error {
 		ch <- prometheus.MustNewConstMetric(
 			prometheus.NewDesc(
 				prometheus.BuildFQName(namespace, "mysql_status", strings.ToLower(key)),
-				"Global status statistic.", nil, nil,
+				"Global status metric.",
+				nil, nil,
 			),
 			prometheus.UntypedValue, val,
 		)
@@ -208,11 +204,12 @@ func newConnPoolMetric(name, hostgroup, endpoint string, value float64, valueTyp
 			"Connection pool usage statistic.",
 			[]string{"hostgroup", "endpoint"}, nil,
 		),
-		valueType, value, hostgroup, endpoint,
+		valueType, value,
+		hostgroup, endpoint,
 	)
 }
 
-// scrapeMySQLConnectionPool collects from stats.stats_mysql_connection_pool.
+// scrapeMySQLConnectionPool collects from `stats_mysql_connection_pool`.
 func scrapeMySQLConnectionPool(db *sql.DB, ch chan<- prometheus.Metric) error {
 	rows, err := db.Query(mysqlConnectionPoolQuery)
 	if err != nil {
@@ -222,9 +219,8 @@ func scrapeMySQLConnectionPool(db *sql.DB, ch chan<- prometheus.Metric) error {
 
 	var (
 		hostgroup       string
-		hostname        string
+		host            string
 		port            string
-		comment         string
 		status          string
 		statusNum       float64
 		ConnUsed        float64
@@ -237,7 +233,7 @@ func scrapeMySQLConnectionPool(db *sql.DB, ch chan<- prometheus.Metric) error {
 		Latency_ms      float64
 	)
 	for rows.Next() {
-		if err := rows.Scan(&hostgroup, &hostname, &port, &comment, &status, &ConnUsed, &ConnFree, &ConnOK, &ConnERR, &Queries, &Bytes_data_sent, &Bytes_data_recv, &Latency_ms); err != nil {
+		if err := rows.Scan(&hostgroup, &host, &port, &status, &ConnUsed, &ConnFree, &ConnOK, &ConnERR, &Queries, &Bytes_data_sent, &Bytes_data_recv, &Latency_ms); err != nil {
 			return err
 		}
 		// Map status to ids.
@@ -251,11 +247,8 @@ func scrapeMySQLConnectionPool(db *sql.DB, ch chan<- prometheus.Metric) error {
 		case "OFFLINE_HARD":
 			statusNum = 4
 		}
-		// Comment contains the node name. If it's not set, let's define it to address:port.
-		endpoint := comment
-		if endpoint == "" {
-			endpoint = hostname + ":" + port
-		}
+
+		endpoint := host + ":" + port
 		newConnPoolMetric("status", hostgroup, endpoint, statusNum, prometheus.GaugeValue, ch)
 		newConnPoolMetric("conn_used", hostgroup, endpoint, ConnUsed, prometheus.GaugeValue, ch)
 		newConnPoolMetric("conn_free", hostgroup, endpoint, ConnFree, prometheus.GaugeValue, ch)
@@ -281,6 +274,10 @@ func main() {
 	log.Infoln("Starting proxysql_exporter", version)
 
 	dsn := os.Getenv("DATA_SOURCE_NAME")
+	if dsn == "" {
+		dsn = "admin:admin@tcp(localhost:6032)/"
+	}
+
 	exporter := NewExporter(dsn)
 	prometheus.MustRegister(exporter)
 
