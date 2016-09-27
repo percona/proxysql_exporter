@@ -4,475 +4,291 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/prometheus/client_golang/prometheus"
-	"net/http"
-	"time"
+	"github.com/prometheus/common/log"
 )
 
 var (
-	addr          string
-	user          string
-	password      string
-	dsn           string
-	retry_millis  int
-	scrape_millis int
+	version = "1.0.0"
+
+	showVersion = flag.Bool(
+		"version", false,
+		"Print version information.",
+	)
+	listenAddress = flag.String(
+		"web.listen-address", ":42004",
+		"Address to listen on for web interface and telemetry.",
+	)
+	metricPath = flag.String(
+		"web.telemetry-path", "/metrics",
+		"Path under which to expose metrics.",
+	)
+	collectMySQLStatus = flag.Bool(
+		"collect.mysql_status", true,
+		"Collect from stats.stats_mysql_global",
+	)
+	collectMySQLConnectionPool = flag.Bool(
+		"collect.mysql_connection_pool", true,
+		"Collect from stats.stats_mysql_connection_pool",
+	)
 )
 
 const (
-	namespace = "proxysql"
-	exporter  = "exporter"
+	namespace                = "proxysql"
+	exporter                 = "exporter"
+	upQuery                  = "SELECT 1"
+	mysqlStatusQuery         = "SELECT Variable_Name, Variable_Value FROM stats.stats_mysql_global"
+	mysqlConnectionPoolQuery = `
+		SELECT hostgroup_id, hostname, port, comment, m.status, ConnUsed, ConnFree, ConnOK, ConnERR, Queries,
+		Bytes_data_sent, Bytes_data_recv, Latency_ms
+		FROM mysql_servers m JOIN stats.stats_mysql_connection_pool s
+		ON m.hostgroup_id=s.hostgroup AND m.hostname=s.srv_host AND m.port=s.srv_port
+	`
 )
 
-// The exported variables
-var (
-	Active_Transactions = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "Active_Transactions",
-			Subsystem: "",
-			Help:      "Active_Transactions from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	// Backend_query_time_nsec : This seems per-thread and it does not make sense to export for a monitoring client.
-	Client_Connections_aborted = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "Client_Connections_aborted",
-			Subsystem: "",
-			Help:      "Client_Connections_aborted from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	Client_Connections_connected = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "Client_Connections_connected",
-			Subsystem: "",
-			Help:      "Client_Connections_connected from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	Client_Connections_created = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "Client_Connections_created",
-			Subsystem: "",
-			Help:      "Client_Connections_created from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	Com_autocommit = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "Com_autocommit",
-			Subsystem: "",
-			Help:      "Com_autocommit from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	Com_autocommit_filtered = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "Com_autocommit_filtered",
-			Subsystem: "",
-			Help:      "Com_autocommit_filtered from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	Com_commit = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "Com_commit",
-			Subsystem: "",
-			Help:      "Com_commit from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	Com_commit_filtered = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "Com_commit_filtered",
-			Subsystem: "",
-			Help:      "Com_commit_filtered from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	Com_rollback = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "Com_rollback",
-			Subsystem: "",
-			Help:      "Com_rollback from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	Com_rollback_filtered = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "Com_rollback_filtered",
-			Subsystem: "",
-			Help:      "Com_rollback_filtered from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	ConPool_memory_bytes = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "ConPool_memory_bytes",
-			Subsystem: "",
-			Help:      "ConPool_memory_bytes from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	MySQL_Monitor_Workers = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "MySQL_Monitor_Workers",
-			Subsystem: "",
-			Help:      "MySQL_Monitor_Workers from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	MySQL_Thread_Workers = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "MySQL_Thread_Workers",
-			Subsystem: "",
-			Help:      "MySQL_Thread_Workers from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	Queries_backends_bytes_recv = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "Queries_backends_bytes_recv",
-			Subsystem: "",
-			Help:      "Queries_backends_bytes_recv from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	Queries_backends_bytes_sent = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "Queries_backends_bytes_sent",
-			Subsystem: "",
-			Help:      "Queries_backends_bytes_sent from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	// Query_Processor_time_nsec not included for the same reason as Backend_query_time_nsec
-	Questions = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "Questions",
-			Subsystem: "",
-			Help:      "Questions from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	SQLite3_memory_bytes = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "SQLite3_memory_bytes",
-			Subsystem: "",
-			Help:      "SQLite3_memory_bytes from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	Server_Connections_aborted = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "Server_Connections_aborted",
-			Subsystem: "",
-			Help:      "Server_Connections_aborted from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	Server_Connections_connected = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "Server_Connections_connected",
-			Subsystem: "",
-			Help:      "Server_Connections_connected from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	Server_Connections_created = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "Server_Connections_created",
-			Subsystem: "",
-			Help:      "Server_Connections_created from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	// Servers_table_version
-	Slow_queries = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Name:      "Slow_queries",
-			Subsystem: "",
-			Help:      "Slow_queries from SHOW MYSQL STATUS",
-			Namespace: namespace,
-		},
-	)
-	// mysql_backend|frontend|session bytes seem per-thread
-	// next are from stats.stats_mysql_connection_pool
-	Stats_MySQL_Connection_Pool_ConnUsed = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name:      "Stats_MySQL_Connection_Pool_ConnUsed",
-			Subsystem: "",
-			Help:      "stats.stats_mysql_connection_pool.ConnUsed",
-			Namespace: namespace,
-		}, []string{"hostgroup", "srv_host", "srv_port"},
-	)
-	Stats_MySQL_Connection_Pool_ConnFree = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name:      "Stats_MySQL_Connection_Pool_ConnFree",
-			Subsystem: "",
-			Help:      "stats.stats_mysql_connection_pool.ConnFree",
-			Namespace: namespace,
-		}, []string{"hostgroup", "srv_host", "srv_port"},
-	)
-	Stats_MySQL_Connection_Pool_ConnOK = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name:      "Stats_MySQL_Connection_Pool_ConnOK",
-			Subsystem: "",
-			Help:      "stats.stats_mysql_connection_pool.ConnOK",
-			Namespace: namespace,
-		}, []string{"hostgroup", "srv_host", "srv_port"},
-	)
-	Stats_MySQL_Connection_Pool_ConnERR = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name:      "Stats_MySQL_Connection_Pool_ConnERR",
-			Subsystem: "",
-			Help:      "stats.stats_mysql_connection_pool.ConnERR",
-			Namespace: namespace,
-		}, []string{"hostgroup", "srv_host", "srv_port"},
-	)
-	Stats_MySQL_Connection_Pool_Queries = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name:      "Stats_MySQL_Connection_Pool_Queries",
-			Subsystem: "",
-			Help:      "stats.stats_mysql_connection_pool.Queries",
-			Namespace: namespace,
-		}, []string{"hostgroup", "srv_host", "srv_port"},
-	)
-	Stats_MySQL_Connection_Pool_Bytes_data_sent = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name:      "Stats_MySQL_Connection_Pool_Bytes_data_sent",
-			Subsystem: "",
-			Help:      "stats.stats_mysql_connection_pool.Bytes_data_sent",
-			Namespace: namespace,
-		}, []string{"hostgroup", "srv_host", "srv_port"},
-	)
-	Stats_MySQL_Connection_Pool_Bytes_data_recv = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name:      "Stats_MySQL_Connection_Pool_Bytes_data_recv",
-			Subsystem: "",
-			Help:      "stats.stats_mysql_connection_pool.Bytes_data_recv",
-			Namespace: namespace,
-		}, []string{"hostgroup", "srv_host", "srv_port"},
-	)
-	Stats_MySQL_Connection_Pool_Latency_ms = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name:      "Stats_MySQL_Connection_Pool_Latency_ms",
-			Subsystem: "",
-			Help:      "stats.stats_mysql_connection_pool.Latency_ms",
-			Namespace: namespace,
-		}, []string{"hostgroup", "srv_host", "srv_port"},
-	)
-)
+var landingPage = []byte(`<html>
+<head><title>ProxySQL exporter</title></head>
+<body>
+<h1>ProxySQL exporter</h1>
+<p><a href='` + *metricPath + `'>Metrics</a></p>
+</body>
+</html>
+`)
 
-func waitBeforeRetry() {
-	time.Sleep(time.Duration(retry_millis) * time.Millisecond)
+type Exporter struct {
+	dsn             string
+	duration, error prometheus.Gauge
+	totalScrapes    prometheus.Counter
+	scrapeErrors    *prometheus.CounterVec
+	proxysqlUP      prometheus.Gauge
 }
 
-// connectToAdmin will attempt to connect to the dsn, retrying indefinitely every retry_millis ms if there is an error
-func connectToAdmin() *sql.DB {
-	for {
-		db, err := sql.Open("mysql", dsn)
-		if err != nil {
-			fmt.Println(err)
-			waitBeforeRetry()
+func NewExporter(dsn string) *Exporter {
+	return &Exporter{
+		dsn: dsn,
+		duration: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: exporter,
+			Name:      "last_scrape_duration_seconds",
+			Help:      "Duration of the last scrape of metrics from ProxySQL.",
+		}),
+		totalScrapes: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: exporter,
+			Name:      "scrapes_total",
+			Help:      "Total number of times ProxySQL was scraped for metrics.",
+		}),
+		scrapeErrors: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: exporter,
+			Name:      "scrape_errors_total",
+			Help:      "Total number of times an error occured scraping a ProxySQL.",
+		}, []string{"collector"}),
+		error: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: exporter,
+			Name:      "last_scrape_error",
+			Help:      "Whether the last scrape of metrics from ProxySQL resulted in an error (1 for error, 0 for success).",
+		}),
+		proxysqlUP: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "up",
+			Help:      "Whether ProxySQL is up.",
+		}),
+	}
+}
+
+func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
+	metricCh := make(chan prometheus.Metric)
+	doneCh := make(chan struct{})
+
+	go func() {
+		for m := range metricCh {
+			ch <- m.Desc()
+		}
+		close(doneCh)
+	}()
+
+	e.Collect(metricCh)
+	close(metricCh)
+	<-doneCh
+}
+
+func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
+	e.scrape(ch)
+
+	ch <- e.duration
+	ch <- e.totalScrapes
+	ch <- e.error
+	e.scrapeErrors.Collect(ch)
+	ch <- e.proxysqlUP
+}
+
+func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
+	e.totalScrapes.Inc()
+	var err error
+	defer func(begun time.Time) {
+		e.duration.Set(time.Since(begun).Seconds())
+		if err == nil {
+			e.error.Set(0)
 		} else {
-			return db
+			e.error.Set(1)
+		}
+	}(time.Now())
+
+	db, err := sql.Open("mysql", e.dsn)
+	if err != nil {
+		log.Errorln("Error opening connection to database:", err)
+		return
+	}
+	defer db.Close()
+
+	isUpRows, err := db.Query(upQuery)
+	if err != nil {
+		log.Errorln("Error pinging ProxySQL:", err)
+		e.proxysqlUP.Set(0)
+		return
+	}
+	isUpRows.Close()
+
+	e.proxysqlUP.Set(1)
+
+	if *collectMySQLStatus {
+		if err = scrapeMySQLStatus(db, ch); err != nil {
+			log.Errorln("Error scraping for collect.mysql_status:", err)
+			e.scrapeErrors.WithLabelValues("collect.mysql_status").Inc()
+		}
+	}
+	if *collectMySQLConnectionPool {
+		if err = scrapeMySQLConnectionPool(db, ch); err != nil {
+			log.Errorln("Error scraping for collect.mysql_connection_pool:", err)
+			e.scrapeErrors.WithLabelValues("collect.mysql_connection_pool").Inc()
 		}
 	}
 }
 
-func scrapeStatsMySQLConnectionPool(db *sql.DB) {
-	ticker := time.NewTicker(time.Duration(scrape_millis) * time.Millisecond)
-	for _ = range ticker.C {
-		rows, err := db.Query("select * from stats.stats_mysql_connection_pool")
-		if err != nil {
-			fmt.Println(err)
-			waitBeforeRetry()
-			db.Close()
-			db = connectToAdmin()
-			continue
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var (
-				hostgroup       string
-				srv_host        string
-				srv_port        string
-				status          string
-				ConnUsed        float64
-				ConnFree        float64
-				ConnOK          float64
-				ConnERR         float64
-				Queries         float64
-				Bytes_data_sent float64
-				Bytes_data_recv float64
-				Latency_ms      float64
-			)
-			err := rows.Scan(&hostgroup, &srv_host, &srv_port, &status, &ConnUsed, &ConnFree, &ConnOK, &ConnERR, &Queries, &Bytes_data_sent, &Bytes_data_recv, &Latency_ms)
-			if err != nil {
-				fmt.Println(err)
-				waitBeforeRetry()
-				continue
-			}
-			Stats_MySQL_Connection_Pool_ConnUsed.With(prometheus.Labels{
-				"hostgroup": hostgroup,
-				"srv_host":  srv_host,
-				"srv_port":  srv_port,
-			}).Set(ConnUsed)
-			Stats_MySQL_Connection_Pool_ConnFree.With(prometheus.Labels{
-				"hostgroup": hostgroup,
-				"srv_host":  srv_host,
-				"srv_port":  srv_port,
-			}).Set(ConnFree)
-			Stats_MySQL_Connection_Pool_ConnOK.With(prometheus.Labels{
-				"hostgroup": hostgroup,
-				"srv_host":  srv_host,
-				"srv_port":  srv_port,
-			}).Set(ConnOK)
-			Stats_MySQL_Connection_Pool_ConnERR.With(prometheus.Labels{
-				"hostgroup": hostgroup,
-				"srv_host":  srv_host,
-				"srv_port":  srv_port,
-			}).Set(ConnERR)
-			Stats_MySQL_Connection_Pool_Queries.With(prometheus.Labels{
-				"hostgroup": hostgroup,
-				"srv_host":  srv_host,
-				"srv_port":  srv_port,
-			}).Set(Queries)
-			Stats_MySQL_Connection_Pool_Bytes_data_sent.With(prometheus.Labels{
-				"hostgroup": hostgroup,
-				"srv_host":  srv_host,
-				"srv_port":  srv_port,
-			}).Set(Bytes_data_sent)
-			Stats_MySQL_Connection_Pool_Bytes_data_recv.With(prometheus.Labels{
-				"hostgroup": hostgroup,
-				"srv_host":  srv_host,
-				"srv_port":  srv_port,
-			}).Set(Bytes_data_recv)
-			Stats_MySQL_Connection_Pool_Latency_ms.With(prometheus.Labels{
-				"hostgroup": hostgroup,
-				"srv_host":  srv_host,
-				"srv_port":  srv_port,
-			}).Set(Latency_ms)
-		}
+// scrapeMySQLStatus collects from stats.stats_mysql_global (SHOW MYSQL STATUS).
+func scrapeMySQLStatus(db *sql.DB, ch chan<- prometheus.Metric) error {
+	rows, err := db.Query(mysqlStatusQuery)
+	if err != nil {
+		return err
 	}
+	defer rows.Close()
+
+	var (
+		key string
+		val float64
+	)
+	for rows.Next() {
+		if err := rows.Scan(&key, &val); err != nil {
+			return err
+		}
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc(
+				prometheus.BuildFQName(namespace, "mysql_status", strings.ToLower(key)),
+				"Global status statistic.", nil, nil,
+			),
+			prometheus.UntypedValue, val,
+		)
+	}
+
+	return nil
 }
 
-func scrapeShowMySQLStatus(db *sql.DB) {
-	ticker := time.NewTicker(time.Duration(scrape_millis) * time.Millisecond)
-	for _ = range ticker.C {
-		rows, err := db.Query("SHOW MYSQL STATUS")
-		if err != nil {
-			fmt.Println(err)
-			waitBeforeRetry()
-			db.Close()
-			db = connectToAdmin()
-			continue
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var Variable_name string
-			var Value float64
-			err := rows.Scan(&Variable_name, &Value)
-			if err != nil {
-				fmt.Println(err)
-				waitBeforeRetry()
-				continue
-			}
-			switch Variable_name {
-			case "Active_transactions":
-				Active_Transactions.Set(Value)
-			case "Client_Connections_aborted":
-				Client_Connections_aborted.Set(Value)
-			case "Client_Connections_connected":
-				Client_Connections_connected.Set(Value)
-			case "Client_Connections_created":
-				Client_Connections_created.Set(Value)
-			case "Com_autocommit":
-				Com_autocommit.Set(Value)
-			case "Com_autocommit_filtered":
-				Com_autocommit_filtered.Set(Value)
-			case "Com_commit":
-				Com_commit.Set(Value)
-			case "Com_commit_filtered":
-				Com_commit_filtered.Set(Value)
-			case "Com_rollback":
-				Com_rollback.Set(Value)
-			case "Com_rollback_filtered":
-				Com_rollback_filtered.Set(Value)
-			case "ConnPool_memory_bytes":
-				ConPool_memory_bytes.Set(Value)
-			case "MySQL_Monitor_Workers":
-				MySQL_Monitor_Workers.Set(Value)
-			case "MySQL_Thread_Workers":
-				MySQL_Thread_Workers.Set(Value)
-			case "Queries_backends_bytes_recv":
-				Queries_backends_bytes_recv.Set(Value)
-			case "Queries_backends_bytes_sent":
-				Queries_backends_bytes_sent.Set(Value)
-			case "Questions":
-				Questions.Set(Value)
-			case "SQLite3_memory_bytes":
-				SQLite3_memory_bytes.Set(Value)
-			case "Server_Connections_aborted":
-				Server_Connections_aborted.Set(Value)
-			case "Server_Connections_connected":
-				Server_Connections_connected.Set(Value)
-			case "Server_Connections_created":
-				Server_Connections_created.Set(Value)
-			case "Slow_queries":
-				Slow_queries.Set(Value)
-
-			}
-		}
-	}
+func newConnPoolMetric(name, hostgroup, endpoint string, value float64, valueType prometheus.ValueType, ch chan<- prometheus.Metric) {
+	ch <- prometheus.MustNewConstMetric(
+		prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "connection_pool", name),
+			"Connection pool usage statistic.",
+			[]string{"hostgroup", "endpoint"}, nil,
+		),
+		valueType, value, hostgroup, endpoint,
+	)
 }
 
-func init() {
-	flag.StringVar(&addr, "listen-address", ":2314", "The address to listen on for HTTP requests.")
-	flag.StringVar(&user, "user", "admin", "The ProxySQL admin interface username.")
-	flag.StringVar(&password, "password", "admin", "The ProxySQL admin interface password.")
-	flag.StringVar(&dsn, "dsn", "admin:admin@tcp(localhost:6032)/admin", "The dsn to use to connect to ProxySQL's admin interface.")
-	flag.IntVar(&retry_millis, "retry_millis", 1000, "The number of milliseconds to wait before retrying after a database failure.")
-	flag.IntVar(&scrape_millis, "scrape_millis", 1000, "The number of milliseconds to wait between scraping runs. ")
-	prometheus.MustRegister(Active_Transactions)
-	prometheus.MustRegister(Client_Connections_aborted)
-	prometheus.MustRegister(Client_Connections_connected)
-	prometheus.MustRegister(Client_Connections_created)
-	prometheus.MustRegister(Com_autocommit)
-	prometheus.MustRegister(Com_autocommit_filtered)
-	prometheus.MustRegister(Com_commit)
-	prometheus.MustRegister(Com_commit_filtered)
-	prometheus.MustRegister(Com_rollback)
-	prometheus.MustRegister(Com_rollback_filtered)
-	prometheus.MustRegister(ConPool_memory_bytes)
-	prometheus.MustRegister(MySQL_Monitor_Workers)
-	prometheus.MustRegister(MySQL_Thread_Workers)
-	prometheus.MustRegister(Queries_backends_bytes_recv)
-	prometheus.MustRegister(Queries_backends_bytes_sent)
-	prometheus.MustRegister(Questions)
-	prometheus.MustRegister(SQLite3_memory_bytes)
-	prometheus.MustRegister(Server_Connections_aborted)
-	prometheus.MustRegister(Server_Connections_connected)
-	prometheus.MustRegister(Server_Connections_created)
-	prometheus.MustRegister(Slow_queries)
-	prometheus.MustRegister(Stats_MySQL_Connection_Pool_ConnUsed)
-	prometheus.MustRegister(Stats_MySQL_Connection_Pool_ConnFree)
-	prometheus.MustRegister(Stats_MySQL_Connection_Pool_ConnOK)
-	prometheus.MustRegister(Stats_MySQL_Connection_Pool_ConnERR)
-	prometheus.MustRegister(Stats_MySQL_Connection_Pool_Queries)
-	prometheus.MustRegister(Stats_MySQL_Connection_Pool_Bytes_data_sent)
-	prometheus.MustRegister(Stats_MySQL_Connection_Pool_Bytes_data_recv)
-	prometheus.MustRegister(Stats_MySQL_Connection_Pool_Latency_ms)
+// scrapeMySQLConnectionPool collects from stats.stats_mysql_connection_pool.
+func scrapeMySQLConnectionPool(db *sql.DB, ch chan<- prometheus.Metric) error {
+	rows, err := db.Query(mysqlConnectionPoolQuery)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var (
+		hostgroup       string
+		hostname        string
+		port            string
+		comment         string
+		status          string
+		statusNum       float64
+		ConnUsed        float64
+		ConnFree        float64
+		ConnOK          float64
+		ConnERR         float64
+		Queries         float64
+		Bytes_data_sent float64
+		Bytes_data_recv float64
+		Latency_ms      float64
+	)
+	for rows.Next() {
+		if err := rows.Scan(&hostgroup, &hostname, &port, &comment, &status, &ConnUsed, &ConnFree, &ConnOK, &ConnERR, &Queries, &Bytes_data_sent, &Bytes_data_recv, &Latency_ms); err != nil {
+			return err
+		}
+		// Map status to ids.
+		switch status {
+		case "ONLINE":
+			statusNum = 1
+		case "SHUNNED":
+			statusNum = 2
+		case "OFFLINE_SOFT":
+			statusNum = 3
+		case "OFFLINE_HARD":
+			statusNum = 4
+		}
+		// Comment contains the node name. If it's not set, let's define it to address:port.
+		endpoint := comment
+		if endpoint == "" {
+			endpoint = hostname + ":" + port
+		}
+		newConnPoolMetric("status", hostgroup, endpoint, statusNum, prometheus.GaugeValue, ch)
+		newConnPoolMetric("conn_used", hostgroup, endpoint, ConnUsed, prometheus.GaugeValue, ch)
+		newConnPoolMetric("conn_free", hostgroup, endpoint, ConnFree, prometheus.GaugeValue, ch)
+		newConnPoolMetric("conn_ok", hostgroup, endpoint, ConnOK, prometheus.CounterValue, ch)
+		newConnPoolMetric("conn_err", hostgroup, endpoint, ConnERR, prometheus.CounterValue, ch)
+		newConnPoolMetric("queries", hostgroup, endpoint, Queries, prometheus.CounterValue, ch)
+		newConnPoolMetric("bytes_data_sent", hostgroup, endpoint, Bytes_data_sent, prometheus.CounterValue, ch)
+		newConnPoolMetric("bytes_data_recv", hostgroup, endpoint, Bytes_data_recv, prometheus.CounterValue, ch)
+		newConnPoolMetric("latency_ms", hostgroup, endpoint, Latency_ms, prometheus.GaugeValue, ch)
+	}
+
+	return nil
 }
 
 func main() {
 	flag.Parse()
-	db := connectToAdmin()
-	defer db.Close()
-	go scrapeShowMySQLStatus(db)
-	go scrapeStatsMySQLConnectionPool(db)
-	http.Handle("/metrics", prometheus.Handler())
-	http.ListenAndServe(addr, nil)
+
+	if *showVersion {
+		fmt.Fprintln(os.Stdout, version)
+		os.Exit(0)
+	}
+
+	log.Infoln("Starting proxysql_exporter", version)
+
+	dsn := os.Getenv("DATA_SOURCE_NAME")
+	exporter := NewExporter(dsn)
+	prometheus.MustRegister(exporter)
+
+	http.Handle(*metricPath, prometheus.Handler())
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write(landingPage)
+	})
+
+	log.Infoln("Listening on", *listenAddress)
+	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 }
