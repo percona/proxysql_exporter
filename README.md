@@ -22,3 +22,7 @@ export DATA_SOURCE_NAME="admin:admin@tcp(localhost:6032)/"
 
 Note, for some reason it does not work with "stats:stats" credentials despite you can run the queries executed by the
 exporter successfully using mysql cli (`Error 1045: no such table: global_variables`).
+
+## Visualize
+
+There is a Grafana dashboard for ProxySQL available as a part of [PMM](https://www.percona.com/doc/percona-monitoring-and-management/index.html) project, you can see the demo [here](https://pmmdemo.percona.com/graph/dashboard/db/proxysql-overview).
