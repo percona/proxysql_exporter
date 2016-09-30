@@ -16,12 +16,11 @@ GOOS=linux go build proxysql_exporter.go
 ## Run
 
 ```
-export DATA_SOURCE_NAME="admin:admin@tcp(localhost:6032)/"
+export DATA_SOURCE_NAME="stats:stats@tcp(localhost:6032)/"
 ./proxysql_exporter
 ```
 
-Note, for some reason it does not work with "stats:stats" credentials despite you can run the queries executed by the
-exporter successfully using mysql cli (`Error 1045: no such table: global_variables`).
+Note, using `stats` user requires ProxySQL 1.2.4 or higher. Otherwise, use `admin` user.
 
 ## Visualize
 

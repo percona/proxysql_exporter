@@ -275,7 +275,7 @@ func main() {
 
 	dsn := os.Getenv("DATA_SOURCE_NAME")
 	if dsn == "" {
-		dsn = "admin:admin@tcp(localhost:6032)/"
+		dsn = "stats:stats@tcp(localhost:6032)/"
 	}
 
 	exporter := NewExporter(dsn)
