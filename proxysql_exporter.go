@@ -79,12 +79,12 @@ func (h *basicAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type Exporter struct {
-	dsn             string
-	duration        prometheus.Gauge
-	error           prometheus.Gauge
-	totalScrapes    prometheus.Counter
-	scrapeErrors    *prometheus.CounterVec
-	proxysqlUP      prometheus.Gauge
+	dsn          string
+	duration     prometheus.Gauge
+	error        prometheus.Gauge
+	totalScrapes prometheus.Counter
+	scrapeErrors *prometheus.CounterVec
+	proxysqlUP   prometheus.Gauge
 }
 
 func NewExporter(dsn string) *Exporter {
@@ -106,7 +106,7 @@ func NewExporter(dsn string) *Exporter {
 			Namespace: namespace,
 			Subsystem: exporter,
 			Name:      "scrape_errors_total",
-			Help:      "Total number of times an error occured scraping a ProxySQL.",
+			Help:      "Total number of times an error occurred scraping a ProxySQL.",
 		}, []string{"collector"}),
 		error: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -238,22 +238,22 @@ func scrapeMySQLConnectionPool(db *sql.DB, ch chan<- prometheus.Metric) error {
 	defer rows.Close()
 
 	var (
-		hostgroup       string
-		host            string
-		port            string
-		status          string
-		statusNum       float64
-		ConnUsed        float64
-		ConnFree        float64
-		ConnOK          float64
-		ConnERR         float64
-		Queries         float64
-		Bytes_data_sent float64
-		Bytes_data_recv float64
-		Latency_ms      float64
+		hostgroup     string
+		host          string
+		port          string
+		status        string
+		statusNum     float64
+		ConnUsed      float64
+		ConnFree      float64
+		ConnOK        float64
+		ConnERR       float64
+		Queries       float64
+		BytesDataSent float64
+		BytesDataRecv float64
+		LatencyMs     float64
 	)
 	for rows.Next() {
-		if err := rows.Scan(&hostgroup, &host, &port, &status, &ConnUsed, &ConnFree, &ConnOK, &ConnERR, &Queries, &Bytes_data_sent, &Bytes_data_recv, &Latency_ms); err != nil {
+		if err := rows.Scan(&hostgroup, &host, &port, &status, &ConnUsed, &ConnFree, &ConnOK, &ConnERR, &Queries, &BytesDataSent, &BytesDataRecv, &LatencyMs); err != nil {
 			return err
 		}
 		// Map status to ids.
@@ -275,9 +275,9 @@ func scrapeMySQLConnectionPool(db *sql.DB, ch chan<- prometheus.Metric) error {
 		newConnPoolMetric("conn_ok", hostgroup, endpoint, ConnOK, prometheus.CounterValue, ch)
 		newConnPoolMetric("conn_err", hostgroup, endpoint, ConnERR, prometheus.CounterValue, ch)
 		newConnPoolMetric("queries", hostgroup, endpoint, Queries, prometheus.CounterValue, ch)
-		newConnPoolMetric("bytes_data_sent", hostgroup, endpoint, Bytes_data_sent, prometheus.CounterValue, ch)
-		newConnPoolMetric("bytes_data_recv", hostgroup, endpoint, Bytes_data_recv, prometheus.CounterValue, ch)
-		newConnPoolMetric("latency_ms", hostgroup, endpoint, Latency_ms, prometheus.GaugeValue, ch)
+		newConnPoolMetric("bytes_data_sent", hostgroup, endpoint, BytesDataSent, prometheus.CounterValue, ch)
+		newConnPoolMetric("bytes_data_recv", hostgroup, endpoint, BytesDataRecv, prometheus.CounterValue, ch)
+		newConnPoolMetric("latency_ms", hostgroup, endpoint, LatencyMs, prometheus.GaugeValue, ch)
 	}
 
 	return nil

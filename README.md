@@ -1,5 +1,7 @@
 # proxysql_exporter
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/percona/proxysql_exporter)](https://goreportcard.com/report/github.com/percona/proxysql_exporter)
+
 Prometheus exporter for [ProxySQL](https://github.com/sysown/proxysql) performance data.
 
 ## Collectors
