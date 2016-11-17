@@ -3,7 +3,10 @@ language: go
 go:
   - 1.7.1
 
+notifications:
+  email: false
+
 script:
-  - go get -u github.com/kardianos/govendor
+  - go get github.com/kardianos/govendor
   - govendor sync
   - go test -v ./...
