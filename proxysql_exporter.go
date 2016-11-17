@@ -29,6 +29,7 @@ var (
 		"web.telemetry-path", "/metrics",
 		"Path under which to expose metrics.",
 	)
+
 	collectMySQLStatus = flag.Bool(
 		"collect.mysql_status", true,
 		"Collect from SHOW MYSQL STATUS",
@@ -44,8 +45,11 @@ const (
 	exporter                 = "exporter"
 	mysqlStatusQuery         = "SHOW MYSQL STATUS"
 	mysqlConnectionPoolQuery = `
-		SELECT hostgroup, srv_host, srv_port, status, ConnUsed, ConnFree, ConnOK, ConnERR, Queries,
-		Bytes_data_sent, Bytes_data_recv, Latency_ms FROM stats_mysql_connection_pool
+		SELECT
+			hostgroup, srv_host, srv_port, status,
+			ConnUsed, ConnFree, ConnOK, ConnERR, Queries,
+			Bytes_data_sent, Bytes_data_recv, Latency_ms
+		FROM stats_mysql_connection_pool
 	`
 )
 
@@ -57,6 +61,22 @@ var landingPage = []byte(`<html>
 </body>
 </html>
 `)
+
+type basicAuthHandler struct {
+	handler  http.HandlerFunc
+	user     string
+	password string
+}
+
+func (h *basicAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	user, password, ok := r.BasicAuth()
+	if !ok || password != h.password || user != h.user {
+		w.Header().Set("WWW-Authenticate", "Basic realm=\"metrics\"")
+		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+		return
+	}
+	h.handler(w, r)
+}
 
 type Exporter struct {
 	dsn             string
@@ -278,10 +298,26 @@ func main() {
 		dsn = "stats:stats@tcp(localhost:6032)/"
 	}
 
+	var authUser, authPass string
+	httpAuth := os.Getenv("HTTP_AUTH")
+	if httpAuth != "" {
+		data := strings.SplitN(httpAuth, ":", 2)
+		if len(data) != 2 || data[0] == "" || data[1] == "" {
+			log.Fatal("HTTP_AUTH should be formatted as user:password")
+		}
+		authUser = data[0]
+		authPass = data[1]
+		log.Infoln("HTTP basic authentication is enabled")
+	}
+
 	exporter := NewExporter(dsn)
 	prometheus.MustRegister(exporter)
 
-	http.Handle(*metricPath, prometheus.Handler())
+	handler := prometheus.Handler()
+	if authUser != "" && authPass != "" {
+		handler = &basicAuthHandler{handler: handler.ServeHTTP, user: authUser, password: authPass}
+	}
+	http.Handle(*metricPath, handler)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write(landingPage)
 	})

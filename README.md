@@ -13,12 +13,15 @@ Prometheus exporter for [ProxySQL](https://github.com/sysown/proxysql) performan
 GOOS=linux go build proxysql_exporter.go
 ```
 
-## Run
+## Usage
 
 ```
 export DATA_SOURCE_NAME="stats:stats@tcp(localhost:6032)/"
 ./proxysql_exporter
 ```
+
+To enable HTTP basic authentication, set environment variable `HTTP_AUTH` to user:password pair.
+For example: `export HTTP_AUTH="user:password"`
 
 Note, using `stats` user requires ProxySQL 1.2.4 or higher. Otherwise, use `admin` user.
 
