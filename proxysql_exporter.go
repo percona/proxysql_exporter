@@ -42,7 +42,6 @@ var (
 
 const (
 	namespace                = "proxysql"
-	exporter                 = "exporter"
 	mysqlStatusQuery         = "SHOW MYSQL STATUS"
 	mysqlConnectionPoolQuery = `
 		SELECT
@@ -78,7 +77,7 @@ func (h *basicAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.handler(w, r)
 }
 
-type Exporter struct {
+type exporter struct {
 	dsn          string
 	duration     prometheus.Gauge
 	error        prometheus.Gauge
@@ -87,30 +86,30 @@ type Exporter struct {
 	proxysqlUP   prometheus.Gauge
 }
 
-func NewExporter(dsn string) *Exporter {
-	return &Exporter{
+func newExporter(dsn string) *exporter {
+	return &exporter{
 		dsn: dsn,
 		duration: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Subsystem: exporter,
+			Subsystem: "exporter",
 			Name:      "last_scrape_duration_seconds",
 			Help:      "Duration of the last scrape of metrics from ProxySQL.",
 		}),
 		totalScrapes: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
-			Subsystem: exporter,
+			Subsystem: "exporter",
 			Name:      "scrapes_total",
 			Help:      "Total number of times ProxySQL was scraped for metrics.",
 		}),
 		scrapeErrors: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
-			Subsystem: exporter,
+			Subsystem: "exporter",
 			Name:      "scrape_errors_total",
 			Help:      "Total number of times an error occurred scraping a ProxySQL.",
 		}, []string{"collector"}),
 		error: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Subsystem: exporter,
+			Subsystem: "exporter",
 			Name:      "last_scrape_error",
 			Help:      "Whether the last scrape of metrics from ProxySQL resulted in an error (1 for error, 0 for success).",
 		}),
@@ -122,7 +121,7 @@ func NewExporter(dsn string) *Exporter {
 	}
 }
 
-func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
+func (e *exporter) Describe(ch chan<- *prometheus.Desc) {
 	metricCh := make(chan prometheus.Metric)
 	doneCh := make(chan struct{})
 
@@ -138,7 +137,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	<-doneCh
 }
 
-func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
+func (e *exporter) Collect(ch chan<- prometheus.Metric) {
 	e.scrape(ch)
 
 	ch <- e.duration
@@ -148,7 +147,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	ch <- e.proxysqlUP
 }
 
-func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
+func (e *exporter) scrape(ch chan<- prometheus.Metric) {
 	e.totalScrapes.Inc()
 	var err error
 	defer func(begun time.Time) {
@@ -310,7 +309,7 @@ func main() {
 		log.Infoln("HTTP basic authentication is enabled")
 	}
 
-	exporter := NewExporter(dsn)
+	exporter := newExporter(dsn)
 	prometheus.MustRegister(exporter)
 
 	handler := prometheus.Handler()
