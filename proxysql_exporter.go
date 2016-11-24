@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
+	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -28,6 +30,10 @@ var (
 	metricPath = flag.String(
 		"web.telemetry-path", "/metrics",
 		"Path under which to expose metrics.",
+	)
+	webAuthFile = flag.String(
+		"web.auth-file", "",
+		"Path to YAML file with server_user, server_password options for http basic auth (overrides HTTP_AUTH env var).",
 	)
 
 	collectMySQLStatus = flag.Bool(
@@ -60,6 +66,11 @@ var landingPage = []byte(`<html>
 </body>
 </html>
 `)
+
+type webAuth struct {
+	User     string `yaml:"server_user,omitempty"`
+	Password string `yaml:"server_password,omitempty"`
+}
 
 type basicAuthHandler struct {
 	handler  http.HandlerFunc
@@ -297,24 +308,32 @@ func main() {
 		dsn = "stats:stats@tcp(localhost:6032)/"
 	}
 
-	var authUser, authPass string
+	cfg := &webAuth{}
 	httpAuth := os.Getenv("HTTP_AUTH")
-	if httpAuth != "" {
+	if *webAuthFile != "" {
+		bytes, err := ioutil.ReadFile(*webAuthFile)
+		if err != nil {
+			log.Fatal("Cannot read auth file:", err)
+		}
+		if err := yaml.Unmarshal(bytes, cfg); err != nil {
+			log.Fatal("Cannot parse auth file:", err)
+		}
+	} else if httpAuth != "" {
 		data := strings.SplitN(httpAuth, ":", 2)
 		if len(data) != 2 || data[0] == "" || data[1] == "" {
 			log.Fatal("HTTP_AUTH should be formatted as user:password")
 		}
-		authUser = data[0]
-		authPass = data[1]
-		log.Infoln("HTTP basic authentication is enabled")
+		cfg.User = data[0]
+		cfg.Password = data[1]
 	}
 
 	exporter := newExporter(dsn)
 	prometheus.MustRegister(exporter)
 
 	handler := prometheus.Handler()
-	if authUser != "" && authPass != "" {
-		handler = &basicAuthHandler{handler: handler.ServeHTTP, user: authUser, password: authPass}
+	if cfg.User != "" && cfg.Password != "" {
+		handler = &basicAuthHandler{handler: handler.ServeHTTP, user: cfg.User, password: cfg.Password}
+		log.Infoln("HTTP basic authentication is enabled")
 	}
 	http.Handle(*metricPath, handler)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
