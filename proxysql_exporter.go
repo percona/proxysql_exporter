@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"flag"
 	"fmt"
@@ -34,6 +35,14 @@ var (
 	webAuthFile = flag.String(
 		"web.auth-file", "",
 		"Path to YAML file with server_user, server_password options for http basic auth (overrides HTTP_AUTH env var).",
+	)
+	sslCertFile = flag.String(
+		"web.ssl-cert-file", "",
+		"Path to SSL certificate file.",
+	)
+	sslKeyFile = flag.String(
+		"web.ssl-key-file", "",
+		"Path to SSL key file.",
 	)
 
 	collectMySQLStatus = flag.Bool(
@@ -313,10 +322,10 @@ func main() {
 	if *webAuthFile != "" {
 		bytes, err := ioutil.ReadFile(*webAuthFile)
 		if err != nil {
-			log.Fatal("Cannot read auth file:", err)
+			log.Fatal("Cannot read auth file: ", err)
 		}
 		if err := yaml.Unmarshal(bytes, cfg); err != nil {
-			log.Fatal("Cannot parse auth file:", err)
+			log.Fatal("Cannot parse auth file: ", err)
 		}
 	} else if httpAuth != "" {
 		data := strings.SplitN(httpAuth, ":", 2)
@@ -335,11 +344,55 @@ func main() {
 		handler = &basicAuthHandler{handler: handler.ServeHTTP, user: cfg.User, password: cfg.Password}
 		log.Infoln("HTTP basic authentication is enabled")
 	}
-	http.Handle(*metricPath, handler)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write(landingPage)
-	})
+
+	if *sslCertFile != "" && *sslKeyFile == "" || *sslCertFile == "" && *sslKeyFile != "" {
+		log.Fatal("One of the flags -web.ssl-cert or -web.ssl-key is missed to enable HTTPS/TLS")
+	}
+	ssl := false
+	if *sslCertFile != "" && *sslKeyFile != "" {
+		if _, err := os.Stat(*sslCertFile); os.IsNotExist(err) {
+			log.Fatal("SSL certificate file does not exist: ", *sslCertFile)
+		}
+		if _, err := os.Stat(*sslKeyFile); os.IsNotExist(err) {
+			log.Fatal("SSL key file does not exist: ", *sslKeyFile)
+		}
+		ssl = true
+		log.Infoln("HTTPS/TLS is enabled")
+	}
 
 	log.Infoln("Listening on", *listenAddress)
-	log.Fatal(http.ListenAndServe(*listenAddress, nil))
+	if ssl {
+		// https
+		mux := http.NewServeMux()
+		mux.Handle(*metricPath, handler)
+		mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+			w.Header().Add("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+			w.Write(landingPage)
+		})
+		tlsCfg := &tls.Config{
+			MinVersion:               tls.VersionTLS12,
+			CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+			PreferServerCipherSuites: true,
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+			},
+		}
+		srv := &http.Server{
+			Addr:         *listenAddress,
+			Handler:      mux,
+			TLSConfig:    tlsCfg,
+			TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0),
+		}
+		log.Fatal(srv.ListenAndServeTLS(*sslCertFile, *sslKeyFile))
+	} else {
+		// http
+		http.Handle(*metricPath, handler)
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Write(landingPage)
+		})
+		log.Fatal(http.ListenAndServe(*listenAddress, nil))
+	}
 }
