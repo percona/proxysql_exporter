@@ -1,7 +1,8 @@
-# proxysql_exporter
+# Percona ProxySQL Exporter
 
 [![Build Status](https://travis-ci.org/percona/proxysql_exporter.svg?branch=master)](https://travis-ci.org/percona/proxysql_exporter)
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/proxysql_exporter)](https://goreportcard.com/report/github.com/percona/proxysql_exporter)
+[![CLA assistant](https://cla-assistant.io/readme/badge/percona/proxysql_exporter)](https://cla-assistant.io/percona/proxysql_exporter)
 
 Prometheus exporter for [ProxySQL](https://github.com/sysown/proxysql) performance data.
 
