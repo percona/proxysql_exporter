@@ -62,7 +62,7 @@ const (
 		SELECT
 			hostgroup, srv_host, srv_port, status,
 			ConnUsed, ConnFree, ConnOK, ConnERR, Queries,
-			Bytes_data_sent, Bytes_data_recv, Latency_ms
+			Bytes_data_sent, Bytes_data_recv, Latency_us
 		FROM stats_mysql_connection_pool
 	`
 )
@@ -269,10 +269,10 @@ func scrapeMySQLConnectionPool(db *sql.DB, ch chan<- prometheus.Metric) error {
 		Queries       float64
 		BytesDataSent float64
 		BytesDataRecv float64
-		LatencyMs     float64
+		LatencyUs     float64
 	)
 	for rows.Next() {
-		if err := rows.Scan(&hostgroup, &host, &port, &status, &ConnUsed, &ConnFree, &ConnOK, &ConnERR, &Queries, &BytesDataSent, &BytesDataRecv, &LatencyMs); err != nil {
+		if err := rows.Scan(&hostgroup, &host, &port, &status, &ConnUsed, &ConnFree, &ConnOK, &ConnERR, &Queries, &BytesDataSent, &BytesDataRecv, &LatencyUs); err != nil {
 			return err
 		}
 		// Map status to ids.
@@ -296,7 +296,7 @@ func scrapeMySQLConnectionPool(db *sql.DB, ch chan<- prometheus.Metric) error {
 		newConnPoolMetric("queries", hostgroup, endpoint, Queries, prometheus.CounterValue, ch)
 		newConnPoolMetric("bytes_data_sent", hostgroup, endpoint, BytesDataSent, prometheus.CounterValue, ch)
 		newConnPoolMetric("bytes_data_recv", hostgroup, endpoint, BytesDataRecv, prometheus.CounterValue, ch)
-		newConnPoolMetric("latency_ms", hostgroup, endpoint, LatencyMs, prometheus.GaugeValue, ch)
+		newConnPoolMetric("latency_us", hostgroup, endpoint, LatencyUs, prometheus.GaugeValue, ch)
 	}
 
 	return nil

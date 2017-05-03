@@ -99,7 +99,7 @@ func TestScrapeMySQLConnectionPool(t *testing.T) {
 	defer db.Close()
 
 	columns := []string{"hostgroup", "srv_host", "srv_port", "status", "ConnUsed", "ConnFree", "ConnOK", "ConnERR",
-		"Queries", "Bytes_data_sent", "Bytes_data_recv", "Latency_ms"}
+		"Queries", "Bytes_data_sent", "Bytes_data_recv", "Latency_us"}
 	rows := sqlmock.NewRows(columns).
 		AddRow("0", "10.91.142.80", "3306", "ONLINE", "0", "45", "1895677", "46", "197941647", "10984550806", "321063484988", "163").
 		AddRow("0", "10.91.142.82", "3306", "SHUNNED", "0", "97", "39859", "0", "386686994", "21643682247", "641406745151", "255").
