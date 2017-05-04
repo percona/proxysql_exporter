@@ -296,7 +296,7 @@ func scrapeMySQLConnectionPool(db *sql.DB, ch chan<- prometheus.Metric) error {
 		newConnPoolMetric("queries", hostgroup, endpoint, Queries, prometheus.CounterValue, ch)
 		newConnPoolMetric("bytes_data_sent", hostgroup, endpoint, Bytes_data_sent, prometheus.CounterValue, ch)
 		newConnPoolMetric("bytes_data_recv", hostgroup, endpoint, Bytes_data_recv, prometheus.CounterValue, ch)
-		newConnPoolMetric("latency_ms", hostgroup, endpoint, Latency_us, prometheus.GaugeValue, ch)
+		newConnPoolMetric("latency_us", hostgroup, endpoint, Latency_us, prometheus.GaugeValue, ch)
 	}
 
 	return nil
