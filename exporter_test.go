@@ -1,3 +1,16 @@
+// Copyright 2016-2017 Percona LLC
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
@@ -45,14 +58,14 @@ func sanitizeQuery(q string) string {
 	return q
 }
 
-func TestScrapeMySQLStatus(t *testing.T) {
+func TestScrapeMySQLGlobal(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("error opening a stub database connection: %s", err)
 	}
 	defer db.Close()
 
-	columns := []string{"Variable_name", "Value"}
+	columns := []string{"Variable_Name", "Variable_Value"}
 	rows := sqlmock.NewRows(columns).
 		AddRow("Active_Transactions", "3").
 		AddRow("Backend_query_time_nsec", "76355784684851").
@@ -60,11 +73,11 @@ func TestScrapeMySQLStatus(t *testing.T) {
 		AddRow("Client_Connections_connected", "64").
 		AddRow("Client_Connections_created", "1087931").
 		AddRow("Servers_table_version", "2019470")
-	mock.ExpectQuery(mysqlStatusQuery).WillReturnRows(rows)
+	mock.ExpectQuery(mySQLGlobalQuery).WillReturnRows(rows)
 
 	ch := make(chan prometheus.Metric)
 	go func() {
-		if err = scrapeMySQLStatus(db, ch); err != nil {
+		if err = scrapeMySQLGlobal(db, ch); err != nil {
 			t.Errorf("error calling function on test: %s", err)
 		}
 		close(ch)
@@ -73,9 +86,9 @@ func TestScrapeMySQLStatus(t *testing.T) {
 	counterExpected := []metricResult{
 		{labels: labelMap{}, value: 3, metricType: dto.MetricType_UNTYPED},
 		{labels: labelMap{}, value: 76355784684851, metricType: dto.MetricType_UNTYPED},
-		{labels: labelMap{}, value: 0, metricType: dto.MetricType_UNTYPED},
-		{labels: labelMap{}, value: 64, metricType: dto.MetricType_UNTYPED},
-		{labels: labelMap{}, value: 1087931, metricType: dto.MetricType_UNTYPED},
+		{labels: labelMap{}, value: 0, metricType: dto.MetricType_COUNTER},
+		{labels: labelMap{}, value: 64, metricType: dto.MetricType_GAUGE},
+		{labels: labelMap{}, value: 1087931, metricType: dto.MetricType_COUNTER},
 		{labels: labelMap{}, value: 2019470, metricType: dto.MetricType_UNTYPED},
 	}
 	convey.Convey("Metrics comparison", t, func() {
@@ -87,7 +100,7 @@ func TestScrapeMySQLStatus(t *testing.T) {
 
 	// Ensure all SQL queries were executed
 	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("there were unfulfilled expections: %s", err)
+		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 }
 
@@ -105,7 +118,7 @@ func TestScrapeMySQLConnectionPool(t *testing.T) {
 		AddRow("0", "10.91.142.82", "3306", "SHUNNED", "0", "97", "39859", "0", "386686994", "21643682247", "641406745151", "255").
 		AddRow("1", "10.91.142.88", "3306", "OFFLINE_SOFT", "0", "18", "31471", "6391", "255993467", "14327840185", "420795691329", "283").
 		AddRow("2", "10.91.142.89", "3306", "OFFLINE_HARD", "0", "18", "31471", "6391", "255993467", "14327840185", "420795691329", "283")
-	mock.ExpectQuery(sanitizeQuery(mysqlConnectionPoolQuery)).WillReturnRows(rows)
+	mock.ExpectQuery(sanitizeQuery(mySQLconnectionPoolQuery)).WillReturnRows(rows)
 
 	ch := make(chan prometheus.Metric)
 	go func() {
@@ -165,6 +178,6 @@ func TestScrapeMySQLConnectionPool(t *testing.T) {
 
 	// Ensure all SQL queries were executed
 	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("there were unfulfilled expections: %s", err)
+		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 }

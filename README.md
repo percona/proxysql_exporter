@@ -1,5 +1,6 @@
 # Percona ProxySQL Exporter
 
+[![Release](https://github-release-version.herokuapp.com/github/percona/proxysql_exporter/release.svg?style=flat)](https://github.com/percona/proxysql_exporter/releases/latest)
 [![Build Status](https://travis-ci.org/percona/proxysql_exporter.svg?branch=master)](https://travis-ci.org/percona/proxysql_exporter)
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/proxysql_exporter)](https://goreportcard.com/report/github.com/percona/proxysql_exporter)
 [![CLA assistant](https://cla-assistant.io/readme/badge/percona/proxysql_exporter)](https://cla-assistant.io/percona/proxysql_exporter)
@@ -8,14 +9,21 @@ Prometheus exporter for [ProxySQL](https://github.com/sysown/proxysql) performan
 
 ## Collectors
 
- * Global status metrics from `SHOW MYSQL STATUS`
- * Connection pool usage statistics from `stats_mysql_connection_pool`
+ * Global status metrics from `SHOW MYSQL STATUS`.
+ * Connection pool usage statistics from `stats_mysql_connection_pool`.
 
-## Build
+## Setting the MySQL server's data source name
 
-```
-GOOS=linux go build proxysql_exporter.go
-```
+The MySQL server's data source name must be set via the `DATA_SOURCE_NAME` environment variable. The format of this variable is described at https://github.com/go-sql-driver/mysql#dsn-data-source-name.
+
+## Building
+
+1. Setup [`GOPATH`](https://golang.org/doc/code.html#GOPATH).
+2. Clone repository to `GOPATH`: `go get -v -d github.com/percona/proxysql_exporter`.
+3. Install released version of Glide: `curl https://glide.sh/get | sh` or `brew install glide`.
+4. Fetch dependencies: `glide install`.
+5. Install exporter: `go install -v`. Binary will be created in `$GOPATH/bin`.
+
 
 ## Usage
 
