@@ -9,6 +9,4 @@ notifications:
   email: false
 
 script:
-  - go get github.com/kardianos/govendor
-  - govendor sync
-  - go test -v ./...
+  - go test -v
