@@ -1,6 +1,11 @@
 sudo: false
 language: go
 
+env:
+  global:
+    # CODECOV_TOKEN
+    secure: m8JzfXBU67EUfszWmm0BFOj7rpK0boTpjGgVgFiki4D1vJ550XIBXTdu2qGjbZGjvI9SHgxCn9uDkM/JAfDkV4gNwuVXVA1433fc9fTxc4xxO1M9hs5qFWVgeEqclDfTGlGXckHKJ7AERP2FpOOIgWc5VthaiO3MGa11pMpUcwQz6imJId11aggY/VrWcPZOchDSI/7lgmNkBGgqh1lLTIx1p3k8FwRSeZQA5FFqQt6DF0smp/I97Q8bZ0If7cI8IGtw8a4N+o9vqtwHu5qygFvyh/c1KWuSm9zUpxD6eb86V9IMFQGh13rYoU/dkl+ogsvSyTrchLJ5SY2k5X0pYS2ehLheKzSeqBIfHI6akdY9zPjCjdPm74pJnOKeMmtn2BeV+Isq1mh4OFUs9rc97zpGLWGskE3a8E/Z86psKlUW1qIrQKemTrL7roAwycZQdW9whHxQzYHNwRJSKHKj7I9yssCQR0HY8qhBPk2SP9+oifOtD0gYNKgPtjOy6xLf1M0shxY/J33NWhuXwm+EGQXw5SHKQ4ocH7kTYBQS6fkovrVo2Wfxkkv8ku9DNMttXK1xz+btSAdpdT2uaJtLeHtqXm/cBYICmpR1u6wlHrGBJMkEMHO0ymshfsChquxoBX1SwTjQnDCaEOpAt2X6U/1UbGQRrPgUMCNDjt7cCdo=
+
 go:
   - 1.7.x
   - 1.8.x
@@ -8,3 +13,6 @@ go:
 
 script:
   - make
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
