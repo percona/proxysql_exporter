@@ -1,6 +1,11 @@
 sudo: false
 language: go
 
+env:
+  global:
+    # COVERALLS_TOKEN
+    secure: qVGWojT88G78+ooyYCV1AoCZdJsJvQANNUNf589QXClvZecKnA5HiNXQVuuIBCMQtQHfSKOYqImkYv7bnZ106X0lVcU676R7okPeGPiemUCyNqUlLC2FwBZMk43+BwQk/e1ExG4Dkx30EvvyFZuvCblxmRrWXECinCN18nITTUKdXS7orfyCZu+pe+TVT9uHcUd/f1rg9SUz2DhkyuAg+xttW2OMFeI6C/nx6g1yZcbLFglUJna0cZqovvaaw5z3Bz1hKkd2AOfVzK5IWnqaV6G8o1PMih8rfCRjbEejZLr9AT4hMN3+jMiyBP+BC3snSw47tyDSleObLP+TBKCAzl2tVIHSZU0/mFZIlzuLJEP/hMwCFxagMTjulKZ4167/qe4FOkHc3PPPXoPLv9E9+4mt+l2kVHmbDF8zD0YW4REec93gByZu7cq2bBApIcZDpWOtc2g6Y0j/MohYT8LVyYCjSRzxahPtOaGDGUV8x4VDz5fa24ASh/OtvNxlae0wgLK5snmXeOGVSA7lK/LzSe5okxT55JdMb5qci+m63iLlv3ofr8TTf1n8XZqkiDqwqL7OOVCaD9FFJ/6DSc5vvM3VAiNi5vcLU0dE9Yi8wgYG5b4oUZfcfrYx9FujRbcbDNunB/HXqff6oYoyeRFuWOsGyF6nVOpzWe2rgc4RvWo=
+
 go:
   - 1.7.x
   - 1.8.x
@@ -8,3 +13,5 @@ go:
 
 script:
   - make
+  - go get -u github.com/mattn/goveralls
+  - goveralls -coverprofile cover.out
