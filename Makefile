@@ -31,7 +31,7 @@ style:
 
 test:
 	@echo ">> running tests"
-	@$(GO) test -short -race $(pkgs)
+	@$(GO) test -short -race -coverprofile cover.out $(pkgs)
 
 format:
 	@echo ">> formatting code"
