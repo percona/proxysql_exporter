@@ -109,6 +109,14 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.proxysqlUp.Collect(ch)
 }
 
+func (e *Exporter) db() (*sql.DB, error) {
+	db, err := sql.Open("mysql", e.dsn)
+	if err == nil {
+		err = db.Ping()
+	}
+	return db, err
+}
+
 func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 	e.scrapesTotal.Inc()
 	var err error
@@ -121,10 +129,7 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 		}
 	}(time.Now())
 
-	db, err := sql.Open("mysql", e.dsn)
-	if err == nil {
-		err = db.Ping()
-	}
+	db, err := e.db()
 	if err != nil {
 		log.Errorln("Error opening connection to ProxySQL:", err)
 		e.proxysqlUp.Set(0)
