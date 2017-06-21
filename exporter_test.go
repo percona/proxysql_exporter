@@ -17,6 +17,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
@@ -107,7 +108,7 @@ func TestScrapeMySQLGlobal(t *testing.T) {
 		close(ch)
 	}()
 
-	counterExpected := []*metricResult{
+	counterExpected := []metricResult{
 		{"proxysql_mysql_status_active_transactions", labelMap{}, 3, dto.MetricType_GAUGE},
 		{"proxysql_mysql_status_backend_query_time_nsec", labelMap{}, 76355784684851, dto.MetricType_UNTYPED},
 		{"proxysql_mysql_status_client_connections_aborted", labelMap{}, 0, dto.MetricType_COUNTER},
@@ -117,7 +118,7 @@ func TestScrapeMySQLGlobal(t *testing.T) {
 	}
 	convey.Convey("Metrics comparison", t, convey.FailureContinues, func() {
 		for _, expect := range counterExpected {
-			got := readMetric(<-ch)
+			got := *readMetric(<-ch)
 			convey.So(got, convey.ShouldResemble, expect)
 		}
 	})
@@ -159,7 +160,7 @@ func TestScrapeMySQLConnectionPool(t *testing.T) {
 		close(ch)
 	}()
 
-	counterExpected := []*metricResult{
+	counterExpected := []metricResult{
 		{"proxysql_connection_pool_status", labelMap{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, 1, dto.MetricType_GAUGE},
 		{"proxysql_connection_pool_conn_used", labelMap{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, 0, dto.MetricType_GAUGE},
 		{"proxysql_connection_pool_conn_free", labelMap{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, 45, dto.MetricType_GAUGE},
@@ -202,7 +203,7 @@ func TestScrapeMySQLConnectionPool(t *testing.T) {
 	}
 	convey.Convey("Metrics comparison", t, convey.FailureContinues, func() {
 		for _, expect := range counterExpected {
-			got := readMetric(<-ch)
+			got := *readMetric(<-ch)
 			convey.So(got, convey.ShouldResemble, expect)
 		}
 	})
@@ -211,4 +212,88 @@ func TestScrapeMySQLConnectionPool(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
+}
+
+func TestExporter(t *testing.T) {
+	if testing.Short() {
+		t.Skip("-short is passed, skipping integration test")
+	}
+
+	// wait up to 30 seconds for ProxySQL to become available
+	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true)
+	for i := 0; i < 30; i++ {
+		db, err := exporter.db()
+		if err != nil {
+			time.Sleep(time.Second)
+			continue
+		}
+
+		// configure ProxySQL
+		for _, q := range strings.Split(`
+DELETE FROM mysql_servers;
+INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (1, 'mysql', 3306);
+INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (1, 'percona-server', 3306);
+LOAD MYSQL SERVERS TO RUNTIME;
+SAVE MYSQL SERVERS TO DISK;
+
+DELETE FROM mysql_users;
+INSERT INTO mysql_users(username, password, default_hostgroup) VALUES ('root', '', 1);
+INSERT INTO mysql_users(username, password, default_hostgroup) VALUES ('monitor', 'monitor', 1);
+LOAD MYSQL USERS TO RUNTIME;
+SAVE MYSQL USERS TO DISK;
+`, ";") {
+			q = strings.TrimSpace(q)
+			if q == "" {
+				continue
+			}
+			_, err = db.Exec(q)
+			if err != nil {
+				t.Fatalf("Failed to execute %q\n%s", q, err)
+			}
+		}
+		break
+	}
+
+	convey.Convey("Metrics descriptions", t, convey.FailureContinues, func() {
+		ch := make(chan *prometheus.Desc)
+		go func() {
+			exporter.Describe(ch)
+			close(ch)
+		}()
+
+		descs := make(map[string]struct{})
+		for d := range ch {
+			descs[d.String()] = struct{}{}
+		}
+
+		convey.So(descs, convey.ShouldContainKey,
+			`Desc{fqName: "proxysql_connection_pool_latency_us", help: "The currently ping time in microseconds, as reported from Monitor.", constLabels: {}, variableLabels: [hostgroup endpoint]}`)
+	})
+
+	convey.Convey("Metrics data", t, convey.FailureContinues, func() {
+		ch := make(chan prometheus.Metric)
+		go func() {
+			exporter.Collect(ch)
+			close(ch)
+		}()
+
+		var metrics []metricResult
+		for m := range ch {
+			got := *readMetric(m)
+			got.value = 0 // ignore actual values in comparison for now
+			metrics = append(metrics, got)
+		}
+
+		for _, m := range metrics {
+			convey.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
+			for k := range m.labels {
+				convey.So(k, convey.ShouldEqual, strings.ToLower(k))
+			}
+		}
+
+		convey.So(metricResult{"proxysql_connection_pool_latency_us", labelMap{"hostgroup": "1", "endpoint": "mysql:3306"}, 0, dto.MetricType_GAUGE},
+			convey.ShouldBeIn, metrics)
+		convey.So(metricResult{"proxysql_connection_pool_latency_us", labelMap{"hostgroup": "1", "endpoint": "percona-server:3306"}, 0, dto.MetricType_GAUGE},
+			convey.ShouldBeIn, metrics)
+	})
 }

@@ -31,7 +31,11 @@ style:
 
 test:
 	@echo ">> running tests"
-	@$(GO) test -short -race -coverprofile coverage.txt $(pkgs)
+	@$(GO) test -v -short -race -coverprofile coverage.txt $(pkgs)
+
+testall:
+	@echo ">> running all tests"
+	@$(GO) test -v -race -coverprofile coverage.txt $(pkgs)
 
 format:
 	@echo ">> formatting code"
