@@ -11,7 +11,7 @@ export DATA_SOURCE_NAME='admin:admin@tcp(127.0.0.1:16032)/'
 ./proxysql_exporter
 ```
 
-`testall` make target will run integration test and also leave ProxySQL inside Docker container in configured state.
+`testall` make target will run integration tests and also leave ProxySQL inside Docker container in configured state.
 
 
 ## Vendoring
