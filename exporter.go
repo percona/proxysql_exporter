@@ -244,8 +244,9 @@ var mySQLconnectionPoolMetrics = map[string]*metric{
 	"bytes_data_recv": {"bytes_data_recv", prometheus.CounterValue,
 		"the amount of data received from the backend, excluding metadata."},
 
-	// This column is called `Latency_us`` since v1.3.1 and v1.4.0, `Latency_ms`` before that,
+	// This column is called `Latency_us` since v1.3.1 and v1.4.0, `Latency_ms` before that,
 	// but actual unit is always μs (microseconds). https://github.com/sysown/proxysql/issues/882
+	// We always expose it as `latency_us`.
 	"latency_us": {"latency_us", prometheus.GaugeValue,
 		"The currently ping time in microseconds, as reported from Monitor."},
 	"latency_ms": {"latency_us", prometheus.GaugeValue,
