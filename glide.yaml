@@ -11,6 +11,7 @@ import:
   - log
   - version
 - package: gopkg.in/yaml.v2
+- package: github.com/percona/exporter_shared
 testImport:
 - package: github.com/prometheus/client_model
   subpackages:

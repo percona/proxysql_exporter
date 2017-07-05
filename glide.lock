@@ -1,5 +1,5 @@
-hash: 2fa41e4b41c5044016db7d79715af8902562f44823f35bfd9f4f9f434cdb6b32
-updated: 2017-06-15T14:26:26.783889812+03:00
+hash: f84221bae1b10e4009591c75c511bf3a832bf16425385dbb37d99a7ecd6cee7f
+updated: 2017-07-05T08:53:23.076381579+03:00
 imports:
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
@@ -15,6 +15,8 @@ imports:
   version: c12348ce28de40eed0136aa2b644d0ee0650e56c
   subpackages:
   - pbutil
+- name: github.com/percona/exporter_shared
+  version: 2004ae2d0b37279fce1e9b36a48cf00b29ed9568
 - name: github.com/prometheus/client_golang
   version: de4d4ffe63b9eff7f27484fdef6e421597e6abb4
   subpackages:
