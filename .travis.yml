@@ -1,14 +1,25 @@
+dist: trusty
+sudo: required
 language: go
 
 go:
-  - 1.7.x
   - 1.8.x
   - tip
 
-notifications:
-  email: false
+env:
+  - PROXYSQL_IMAGE=percona/proxysql:1.2.1
+  - PROXYSQL_IMAGE=perconalab/proxysql:1.3.6
+
+services:
+  - docker
+
+before_script:
+  - docker --version
+  - docker-compose --version
+  - docker-compose up -d
 
 script:
-  - go get github.com/kardianos/govendor
-  - govendor sync
-  - go test -v ./...
+  - make format build testall
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

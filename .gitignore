@@ -1,3 +1,2 @@
 proxysql_exporter
-vendor
-!vendor/vendor.json
+coverage.txt
