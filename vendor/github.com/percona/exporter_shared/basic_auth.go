@@ -93,10 +93,10 @@ func (h *basicAuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // handler returns http.Handler for default Prometheus registry.
-func handler() http.Handler {
+func handler(errorHandling promhttp.HandlerErrorHandling) http.Handler {
 	handler := promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{
 		ErrorLog:      log.NewErrorLogger(),
-		ErrorHandling: promhttp.HTTPErrorOnError,
+		ErrorHandling: errorHandling,
 	})
 
 	auth := readBasicAuth()
