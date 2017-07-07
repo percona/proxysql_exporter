@@ -83,6 +83,17 @@ func NewExporter(dsn string, scrapeMySQLGlobal bool, scrapeMySQLConnectionPool b
 // to the provided channel and returns once the last descriptor has been sent.
 // Part of prometheus.Collector interface.
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
+	// We cannot know in advance what metrics the exporter will generate
+	// from ProxySQL. So we use the poor man's describe method: Run a collect
+	// and send the descriptors of all the collected metrics. The problem
+	// here is that we need to connect to the ProxySQL. If it is currently
+	// unavailable, the descriptors will be incomplete. Since this is a
+	// stand-alone exporter and not used as a library within other code
+	// implementing additional metrics, the worst that can happen is that we
+	// don't detect inconsistent metrics created by this exporter
+	// itself. Also, a change in the monitored ProxySQL instance may change the
+	// exported metrics during the runtime of the exporter.
+
 	metricCh := make(chan prometheus.Metric)
 	doneCh := make(chan struct{})
 
