@@ -3,7 +3,7 @@
 version: '3'
 services:
   proxysql:
-    image: ${PROXYSQL_IMAGE:-perconalab/proxysql:1.3.6}
+    image: ${PROXYSQL_IMAGE:-percona/proxysql:latest}
     environment:
       # those environment variables are not actually required by ProxySQL, but entrypoint erroneously checks them
       - CLUSTER_NAME=dummy
