@@ -23,8 +23,8 @@ make
 The MySQL server's data source name must be set via the `DATA_SOURCE_NAME` environment variable. The format of this
 variable is described at https://github.com/go-sql-driver/mysql#dsn-data-source-name.
 
-To enable HTTP basic authentication, set environment variable `HTTP_AUTH` to user:password pair. Alternatively, you can
-use YAML file with `server_user` and `server_password` fields.
+To enable HTTP basic authentication, set environment variable `HTTP_AUTH` to `user:password` pair. Alternatively, you can
+use YAML file with `server_user` and `server_password` fields and set `-web.auth-file` flag.
 
 ```bash
 export DATA_SOURCE_NAME='stats:stats@tcp(127.0.0.1:42004)/'
