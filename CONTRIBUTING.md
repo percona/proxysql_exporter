@@ -16,5 +16,5 @@ export DATA_SOURCE_NAME='admin:admin@tcp(127.0.0.1:16032)/'
 
 ## Vendoring
 
-We use [Glide](https://glide.sh) to vendor dependencies. Please use released version of Glide (i.e. do not `go get`
-from `master` branch). Also please use `--strip-vendor` flag.
+We use [dep](https://github.com/golang/dep) to vendor dependencies.
+Please use released version of dep (i.e. do not `go get` from `master` branch).
