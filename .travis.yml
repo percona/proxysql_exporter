@@ -4,6 +4,7 @@ language: go
 
 go:
   - 1.8.x
+  - 1.10.x
   - tip
 
 env:
@@ -23,3 +24,6 @@ script:
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
+
+notifications:
+  email: false
