@@ -4,8 +4,8 @@ language: go
 
 go:
   - 1.8.x
+  - 1.9.x
   - 1.10.x
-  - tip
 
 env:
   - PROXYSQL_IMAGE=percona/proxysql:1.2.1
