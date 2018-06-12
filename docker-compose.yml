@@ -12,7 +12,7 @@ services:
       - 127.0.0.1:13306:3306  # user interface
       - 127.0.0.1:16032:6032  # admin interface
   mysql:
-    image: mysql:5.7
+    image: mysql:8.0
     environment:
       - MYSQL_ALLOW_EMPTY_PASSWORD=yes
       - MYSQL_USER=monitor

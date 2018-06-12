@@ -123,7 +123,9 @@ func (c *funcContext) translateStmt(stmt ast.Stmt, label *types.Label) {
 			var bodyPrefix []ast.Stmt
 			if implicit := c.p.Implicits[clause]; implicit != nil {
 				value := refVar
-				if _, isInterface := implicit.Type().Underlying().(*types.Interface); !isInterface {
+				if typesutil.IsJsObject(implicit.Type().Underlying()) {
+					value += ".$val.object"
+				} else if _, ok := implicit.Type().Underlying().(*types.Interface); !ok {
 					value += ".$val"
 				}
 				bodyPrefix = []ast.Stmt{&ast.AssignStmt{
@@ -701,7 +703,7 @@ func (c *funcContext) translateAssign(lhs, rhs ast.Expr, define bool) string {
 		}
 		fields, jsTag := c.translateSelection(sel, l.Pos())
 		if jsTag != "" {
-			return fmt.Sprintf("%s.%s.%s = %s;", c.translateExpr(l.X), strings.Join(fields, "."), jsTag, c.externalize(rhsExpr.String(), sel.Type()))
+			return fmt.Sprintf("%s.%s%s = %s;", c.translateExpr(l.X), strings.Join(fields, "."), formatJSStructTagVal(jsTag), c.externalize(rhsExpr.String(), sel.Type()))
 		}
 		return fmt.Sprintf("%s.%s = %s;", c.translateExpr(l.X), strings.Join(fields, "."), rhsExpr)
 	case *ast.StarExpr:
