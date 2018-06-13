@@ -354,6 +354,43 @@ func TestPreparedQueryExecutions(t *testing.T) {
 	}
 }
 
+func TestUnorderedPreparedQueryExecutions(t *testing.T) {
+	t.Parallel()
+	db, mock, err := New()
+	if err != nil {
+		t.Errorf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	mock.MatchExpectationsInOrder(false)
+
+	mock.ExpectPrepare("SELECT (.+) FROM articles WHERE id = ?").
+		ExpectQuery().
+		WithArgs(5).
+		WillReturnRows(NewRows([]string{"id", "title"}).FromCSVString("5,The quick brown fox"))
+	mock.ExpectPrepare("SELECT (.+) FROM authors WHERE id = ?").
+		ExpectQuery().
+		WithArgs(1).
+		WillReturnRows(NewRows([]string{"id", "title"}).FromCSVString("1,Betty B."))
+
+	var id int
+	var name string
+
+	stmt, err := db.Prepare("SELECT id, name FROM authors WHERE id = ?")
+	if err != nil {
+		t.Errorf("error '%s' was not expected while creating a prepared statement", err)
+	}
+
+	err = stmt.QueryRow(1).Scan(&id, &name)
+	if err != nil {
+		t.Errorf("error '%s' was not expected querying row from statement and scanning", err)
+	}
+
+	if name != "Betty B." {
+		t.Errorf("expected mocked name to be 'Betty B.', but got '%s' instead", name)
+	}
+}
+
 func TestUnexpectedOperations(t *testing.T) {
 	t.Parallel()
 	db, mock, err := New()
@@ -994,5 +1031,35 @@ func TestExpectedBeginOrder(t *testing.T) {
 	mock.ExpectBegin().WillReturnError(fmt.Errorf("Begin failed"))
 	if err := db.Close(); err == nil {
 		t.Error("an error was expected when calling close, but got none")
+	}
+}
+
+func TestPreparedStatementCloseExpectation(t *testing.T) {
+	// Open new mock database
+	db, mock, err := New()
+	if err != nil {
+		fmt.Println("error creating mock database")
+		return
+	}
+	defer db.Close()
+
+	ep := mock.ExpectPrepare("INSERT INTO ORDERS").WillBeClosed()
+	ep.ExpectExec().WillReturnResult(NewResult(1, 1))
+
+	stmt, err := db.Prepare("INSERT INTO ORDERS(ID, STATUS) VALUES (?, ?)")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := stmt.Exec(1, "Hello"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := stmt.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expections: %s", err)
 	}
 }

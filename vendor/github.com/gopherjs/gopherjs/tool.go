@@ -31,11 +31,13 @@ import (
 
 	gbuild "github.com/gopherjs/gopherjs/build"
 	"github.com/gopherjs/gopherjs/compiler"
+	"github.com/gopherjs/gopherjs/internal/sysutil"
 	"github.com/kisielk/gotool"
 	"github.com/neelance/sourcemap"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/tools/go/buildutil"
 )
 
 var currentDirectory string
@@ -114,10 +116,8 @@ func main() {
 							s.Watcher.Add(name)
 						}
 					}
-					if err := s.BuildFiles(args, pkgObj, currentDirectory); err != nil {
-						return err
-					}
-					return nil
+					err := s.BuildFiles(args, pkgObj, currentDirectory)
+					return err
 				}
 
 				// Expand import path patterns.
@@ -142,7 +142,7 @@ func main() {
 					}
 					if len(pkgs) == 1 { // Only consider writing output if single package specified.
 						if pkgObj == "" {
-							pkgObj = filepath.Base(pkg.ImportPath) + ".js"
+							pkgObj = filepath.Base(pkg.Dir) + ".js"
 						}
 						if pkg.IsCommand() && !pkg.UpToDate {
 							if err := s.WriteCommandPackage(archive, pkgObj); err != nil {
@@ -308,6 +308,13 @@ func main() {
 			patternContext := gbuild.NewBuildContext("", options.BuildTags)
 			args = (&gotool.Context{BuildContext: *patternContext}).ImportPaths(args)
 
+			if *compileOnly && len(args) > 1 {
+				return errors.New("cannot use -c flag with multiple packages")
+			}
+			if *outputFilename != "" && len(args) > 1 {
+				return errors.New("cannot use -o flag with multiple packages")
+			}
+
 			pkgs := make([]*gbuild.PackageData, len(args))
 			for i, pkgPath := range args {
 				var err error
@@ -325,26 +332,23 @@ func main() {
 				}
 				s := gbuild.NewSession(options)
 
-				tests := &testFuncs{Package: pkg.Package}
+				tests := &testFuncs{BuildContext: s.BuildContext(), Package: pkg.Package}
 				collectTests := func(testPkg *gbuild.PackageData, testPkgName string, needVar *bool) error {
 					if testPkgName == "_test" {
 						for _, file := range pkg.TestGoFiles {
-							if err := tests.load(filepath.Join(pkg.Package.Dir, file), testPkgName, &tests.ImportTest, &tests.NeedTest); err != nil {
+							if err := tests.load(pkg.Package.Dir, file, testPkgName, &tests.ImportTest, &tests.NeedTest); err != nil {
 								return err
 							}
 						}
 					} else {
 						for _, file := range pkg.XTestGoFiles {
-							if err := tests.load(filepath.Join(pkg.Package.Dir, file), "_xtest", &tests.ImportXtest, &tests.NeedXtest); err != nil {
+							if err := tests.load(pkg.Package.Dir, file, "_xtest", &tests.ImportXtest, &tests.NeedXtest); err != nil {
 								return err
 							}
 						}
 					}
 					_, err := s.BuildPackage(testPkg)
-					if err != nil {
-						return err
-					}
-					return nil
+					return err
 				}
 
 				if err := collectTests(&gbuild.PackageData{
@@ -450,7 +454,7 @@ func main() {
 				}
 				status := "ok  "
 				start := time.Now()
-				if err := runNode(outfile.Name(), args, pkg.Dir, options.Quiet); err != nil {
+				if err := runNode(outfile.Name(), args, runTestDir(pkg), options.Quiet); err != nil {
 					if _, ok := err.(*exec.ExitError); !ok {
 						return err
 					}
@@ -737,6 +741,8 @@ func sprintError(err error) string {
 	}
 }
 
+// runNode runs script with args using Node.js in directory dir.
+// If dir is empty string, current directory is used.
 func runNode(script string, args []string, dir string, quiet bool) error {
 	var allArgs []string
 	if b, _ := strconv.ParseBool(os.Getenv("SOURCE_MAP_SUPPORT")); os.Getenv("SOURCE_MAP_SUPPORT") == "" || b {
@@ -750,9 +756,29 @@ func runNode(script string, args []string, dir string, quiet bool) error {
 	}
 
 	if runtime.GOOS != "windows" {
-		allArgs = append(allArgs, "--stack_size=10000", script)
+		// We've seen issues with stack space limits causing
+		// recursion-heavy standard library tests to fail (e.g., see
+		// https://github.com/gopherjs/gopherjs/pull/669#issuecomment-319319483).
+		//
+		// There are two separate limits in non-Windows environments:
+		//
+		// -	OS process limit
+		// -	Node.js (V8) limit
+		//
+		// GopherJS fetches the current OS process limit, and sets the
+		// Node.js limit to the same value. So both limits are kept in sync
+		// and can be controlled by setting OS process limit. E.g.:
+		//
+		// 	ulimit -s 10000 && gopherjs test
+		//
+		cur, err := sysutil.RlimitStack()
+		if err != nil {
+			return fmt.Errorf("failed to get stack size limit: %v", err)
+		}
+		allArgs = append(allArgs, fmt.Sprintf("--stack_size=%v", cur/1000)) // Convert from bytes to KB.
 	}
 
+	allArgs = append(allArgs, script)
 	allArgs = append(allArgs, args...)
 
 	node := exec.Command("node", allArgs...)
@@ -767,16 +793,28 @@ func runNode(script string, args []string, dir string, quiet bool) error {
 	return err
 }
 
+// runTestDir returns the directory for Node.js to use when running tests for package p.
+// Empty string means current directory.
+func runTestDir(p *gbuild.PackageData) string {
+	if p.IsVirtual {
+		// The package is virtual and doesn't have a physical directory. Use current directory.
+		return ""
+	}
+	// Run tests in the package directory.
+	return p.Dir
+}
+
 type testFuncs struct {
-	Tests       []testFunc
-	Benchmarks  []testFunc
-	Examples    []testFunc
-	TestMain    *testFunc
-	Package     *build.Package
-	ImportTest  bool
-	NeedTest    bool
-	ImportXtest bool
-	NeedXtest   bool
+	BuildContext *build.Context
+	Tests        []testFunc
+	Benchmarks   []testFunc
+	Examples     []testFunc
+	TestMain     *testFunc
+	Package      *build.Package
+	ImportTest   bool
+	NeedTest     bool
+	ImportXtest  bool
+	NeedXtest    bool
 }
 
 type testFunc struct {
@@ -788,8 +826,8 @@ type testFunc struct {
 
 var testFileSet = token.NewFileSet()
 
-func (t *testFuncs) load(filename, pkg string, doImport, seen *bool) error {
-	f, err := parser.ParseFile(testFileSet, filename, nil, parser.ParseComments)
+func (t *testFuncs) load(dir, file, pkg string, doImport, seen *bool) error {
+	f, err := buildutil.ParseFile(testFileSet, t.BuildContext, nil, dir, file, parser.ParseComments)
 	if err != nil {
 		return err
 	}
