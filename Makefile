@@ -22,6 +22,8 @@ BIN_DIR             ?= $(shell pwd)
 DOCKER_IMAGE_NAME   ?= proxysql-exporter
 DOCKER_IMAGE_TAG    ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
 
+# Race detector is only supported on amd64.
+RACE := $(shell test $$(go env GOARCH) != "amd64" || (echo "-race"))
 
 all: format build test
 
@@ -31,11 +33,11 @@ style:
 
 test:
 	@echo ">> running tests"
-	@$(GO) test -v -short -race -coverprofile coverage.txt $(pkgs)
+	@$(GO) test -v -short $(RACE) -coverprofile coverage.txt $(pkgs)
 
 testall:
 	@echo ">> running all tests"
-	@$(GO) test -v -race -coverprofile coverage.txt $(pkgs)
+	@$(GO) test -v $(RACE) -coverprofile coverage.txt $(pkgs)
 
 format:
 	@echo ">> formatting code"
@@ -59,7 +61,7 @@ docker:
 
 promu:
 	@GOOS=$(shell uname -s | tr A-Z a-z) \
-		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(shell uname -m))) \
+		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(subst aarch64,arm64,$(shell uname -m)))) \
 		$(GO) get -u github.com/prometheus/promu
 
 
