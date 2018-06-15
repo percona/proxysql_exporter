@@ -17,7 +17,6 @@ const ( // equality
 	shouldHaveBeenTrue              = "Expected: true\nActual:   %v"
 	shouldHaveBeenFalse             = "Expected: false\nActual:   %v"
 	shouldHaveBeenZeroValue         = "'%+v' should have been the zero value" //"Expected: (zero value)\nActual:   %v"
-	shouldNotHaveBeenZeroValue      = "'%+v' should NOT have been the zero value"
 )
 
 const ( // quantity comparisons
