@@ -186,8 +186,8 @@ var mySQLGlobalMetrics = map[string]*metric{
 		"Total number of frontend connections created so far."},
 	"client_connections_non_idle": {"client_connections_non_idle", prometheus.GaugeValue,
 		"Current number of client connections that are not idle."},
-	"proxysql_uptime": {"proxysql_uptime", prometheus.CounterValue,
-		"Uptime in seconds."},
+	"proxysql_uptime": {"proxysql_start_time_seconds", prometheus.CounterValue,
+		"Unix start time in seconds."},
 	"questions": {"questions", prometheus.CounterValue,
 		"Total number of queries sent from frontends."},
 	"slow_queries": {"slow_queries", prometheus.CounterValue,
@@ -221,6 +221,10 @@ func scrapeMySQLGlobal(db *sql.DB, ch chan<- prometheus.Metric) error {
 				valueType: prometheus.UntypedValue,
 				help:      "Undocumented stats_mysql_global metric.",
 			}
+		}
+		switch name {
+		case "proxysql_uptime":
+			value = float64(time.Now().Unix()) - value
 		}
 		ch <- prometheus.MustNewConstMetric(
 			prometheus.NewDesc(
