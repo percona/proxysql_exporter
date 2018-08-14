@@ -32,6 +32,7 @@ type Exporter struct {
 	dsn                       string
 	scrapeMySQLGlobal         bool
 	scrapeMySQLConnectionPool bool
+	scrapeMySQLConnectionList bool
 	scrapesTotal              prometheus.Counter
 	scrapeErrorsTotal         *prometheus.CounterVec
 	lastScrapeError           prometheus.Gauge
@@ -41,11 +42,12 @@ type Exporter struct {
 
 // NewExporter returns a new ProxySQL exporter for the provided DSN.
 // It scrapes stats_mysql_global and stats_mysql_connection_pool if corresponding parameters are true.
-func NewExporter(dsn string, scrapeMySQLGlobal bool, scrapeMySQLConnectionPool bool) *Exporter {
+func NewExporter(dsn string, scrapeMySQLGlobal bool, scrapeMySQLConnectionPool bool, scrapeMySQLConnectionList bool) *Exporter {
 	return &Exporter{
 		dsn:                       dsn,
 		scrapeMySQLGlobal:         scrapeMySQLGlobal,
 		scrapeMySQLConnectionPool: scrapeMySQLConnectionPool,
+		scrapeMySQLConnectionList: scrapeMySQLConnectionList,
 
 		scrapesTotal: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
@@ -160,6 +162,12 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 		if err = scrapeMySQLConnectionPool(db, ch); err != nil {
 			log.Errorln("Error scraping for collect.mysql_connection_pool:", err)
 			e.scrapeErrorsTotal.WithLabelValues("collect.mysql_connection_pool").Inc()
+		}
+	}
+	if e.scrapeMySQLConnectionList {
+		if err = scrapeMySQLConnectionList(db, ch); err != nil {
+			log.Errorln("Error scraping for collect.mysql_connection_list:", err)
+			e.scrapeErrorsTotal.WithLabelValues("collect.mysql_connection_list").Inc()
 		}
 	}
 }
@@ -339,6 +347,64 @@ func scrapeMySQLConnectionPool(db *sql.DB, ch chan<- prometheus.Metric) error {
 				hostgroup, srvHost+":"+srvPort,
 			)
 		}
+	}
+	return rows.Err()
+}
+
+const mySQLConnectionListQuery = "SELECT COUNT(cli_host) as connection_count, cli_host FROM stats_mysql_processlist GROUP BY cli_host"
+
+var mySQLconnectionListMetrics = map[string]*metric{
+	"connection_count": {"client_connection_list", prometheus.GaugeValue,
+		"Total number of frontend connections"},
+}
+
+// scrapeMySQLConnectionList collects connection list from `stats_mysql_processlist`.
+func scrapeMySQLConnectionList(db *sql.DB, ch chan<- prometheus.Metric) error {
+	rows, err := db.Query(mySQLConnectionListQuery)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+
+	scan := make([]interface{}, len(columns))
+	var cli_host string
+	var conn_num float64
+
+	scan[0], scan[1] = &conn_num, &cli_host
+	for i := 2; i < len(scan); i++ {
+		scan[i] = new(string)
+	}
+
+	for rows.Next() {
+		if err = rows.Scan(scan...); err != nil {
+			return err
+		}
+
+		column := strings.ToLower(columns[0])
+
+		m := mySQLconnectionListMetrics[column]
+		if m == nil {
+			m = &metric{
+				name:      "client_connection_list",
+				valueType: prometheus.UntypedValue,
+				help:      "Undocumented stats_mysql_processlist metric.",
+			}
+		}
+
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc(
+				prometheus.BuildFQName(namespace, "processlist", m.name),
+				m.help,
+				[]string{"client_host"}, nil,
+			),
+			m.valueType, conn_num,
+			cli_host,
+		)
 	}
 	return rows.Err()
 }
