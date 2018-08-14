@@ -372,10 +372,10 @@ func scrapeMySQLConnectionList(db *sql.DB, ch chan<- prometheus.Metric) error {
 	}
 
 	scan := make([]interface{}, len(columns))
-	var cli_host string
-	var conn_num float64
+	var cliHost string
+	var connNum float64
 
-	scan[0], scan[1] = &conn_num, &cli_host
+	scan[0], scan[1] = &connNum, &cliHost
 	for i := 2; i < len(scan); i++ {
 		scan[i] = new(string)
 	}
@@ -402,8 +402,8 @@ func scrapeMySQLConnectionList(db *sql.DB, ch chan<- prometheus.Metric) error {
 				m.help,
 				[]string{"client_host"}, nil,
 			),
-			m.valueType, conn_num,
-			cli_host,
+			m.valueType, connNum,
+			cliHost,
 		)
 	}
 	return rows.Err()
