@@ -215,13 +215,63 @@ func TestScrapeMySQLConnectionPool(t *testing.T) {
 	}
 }
 
+func TestScrapeMySQLConnectionList(t *testing.T) {
+	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func() {
+		for c, m := range mySQLconnectionListMetrics {
+			convey.So(c, convey.ShouldEqual, strings.ToLower(c))
+			convey.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
+		}
+	})
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("error opening a stub database connection: %s", err)
+	}
+	defer db.Close()
+
+	columns := []string{"connection_count", "cli_host"}
+	rows := sqlmock.NewRows(columns).
+		AddRow("10", "10.91.142.80").
+		AddRow("15", "10.91.142.82").
+		AddRow("20", "10.91.142.88").
+		AddRow("25", "10.91.142.89")
+	mock.ExpectQuery(sanitizeQuery(mySQLConnectionListQuery)).WillReturnRows(rows)
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		if err = scrapeMySQLConnectionList(db, ch); err != nil {
+			t.Errorf("error calling function on test: %s", err)
+		}
+		close(ch)
+	}()
+
+	counterExpected := []metricResult{
+		{"proxysql_processlist_client_connection_list", prometheus.Labels{"client_host": "10.91.142.80"}, 10, dto.MetricType_GAUGE},
+		{"proxysql_processlist_client_connection_list", prometheus.Labels{"client_host": "10.91.142.82"}, 15, dto.MetricType_GAUGE},
+		{"proxysql_processlist_client_connection_list", prometheus.Labels{"client_host": "10.91.142.88"}, 20, dto.MetricType_GAUGE},
+		{"proxysql_processlist_client_connection_list", prometheus.Labels{"client_host": "10.91.142.89"}, 25, dto.MetricType_GAUGE},
+	}
+
+	convey.Convey("Metrics comparison", t, convey.FailureContinues, func() {
+		for _, expect := range counterExpected {
+			got := *readMetric(<-ch)
+			convey.So(got, convey.ShouldResemble, expect)
+		}
+	})
+
+	// Ensure all SQL queries were executed
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
 func TestExporter(t *testing.T) {
 	if testing.Short() {
 		t.Skip("-short is passed, skipping integration test")
 	}
 
 	// wait up to 30 seconds for ProxySQL to become available
-	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true)
+	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true)
 	for i := 0; i < 30; i++ {
 		db, err := exporter.db()
 		if err != nil {
