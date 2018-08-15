@@ -269,6 +269,8 @@ func TestScrapeMySQLConnectionPoolError(t *testing.T) {
 		"hostgroup": {},
 		"latency_us": {"latency_us", prometheus.GaugeValue,
 			"The currently ping time in microseconds, as reported from Monitor."},
+		"latency_ms": {"latency_us", prometheus.GaugeValue,
+			"The currently ping time in microseconds, as reported from Monitor."},
 	}
 
 	db2, mock2, err2 := sqlmock.New()
