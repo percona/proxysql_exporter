@@ -15,6 +15,7 @@
 package main
 
 import (
+	"errors"
 	"regexp"
 	"strings"
 	"testing"
@@ -130,6 +131,40 @@ func TestScrapeMySQLGlobal(t *testing.T) {
 	}
 }
 
+func TestScrapeMySQLGlobalError(t *testing.T) {
+	db1, mock1, err1 := sqlmock.New()
+	if err1 != nil {
+		t.Fatalf("error opening a stub database connection: %s", err1)
+	}
+	defer db1.Close()
+
+	mock1.ExpectQuery(mySQLGlobalQuery).WillReturnError(errors.New("an error"))
+	ch1 := make(chan prometheus.Metric)
+
+	go func() {
+		scrapeMySQLGlobal(db1, ch1)
+		close(ch1)
+	}()
+
+	db2, mock2, err2 := sqlmock.New()
+	if err2 != nil {
+		t.Fatalf("error opening a stub database connection: %s", err2)
+	}
+	defer db2.Close()
+
+	columns := []string{"Variable_Name", "Variable_Value"}
+	rows := sqlmock.NewRows(columns).AddRow("Active_Transactions", "3")
+	mock2.ExpectQuery(sanitizeQuery(mySQLGlobalQuery)).WillReturnRows(rows)
+
+	ch2 := make(chan prometheus.Metric)
+	go func() {
+		scrapeMySQLGlobal(db2, ch2)
+		close(ch2)
+	}()
+
+	_ = *readMetric(<-ch2)
+}
+
 func TestScrapeMySQLConnectionPool(t *testing.T) {
 	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func() {
 		for c, m := range mySQLconnectionPoolMetrics {
@@ -215,6 +250,47 @@ func TestScrapeMySQLConnectionPool(t *testing.T) {
 	}
 }
 
+func TestScrapeMySQLConnectionPoolError(t *testing.T) {
+	db1, mock1, err1 := sqlmock.New()
+	if err1 != nil {
+		t.Fatalf("error opening a stub database connection: %s", err1)
+	}
+	defer db1.Close()
+
+	mock1.ExpectQuery(mySQLconnectionPoolQuery).WillReturnError(errors.New("an error"))
+	ch1 := make(chan prometheus.Metric)
+
+	go func() {
+		scrapeMySQLConnectionPool(db1, ch1)
+		close(ch1)
+	}()
+
+	mySQLconnectionPoolMetrics = map[string]*metric{
+		"hostgroup": {},
+		"latency_us": {"latency_us", prometheus.GaugeValue,
+			"The currently ping time in microseconds, as reported from Monitor."},
+	}
+
+	db2, mock2, err2 := sqlmock.New()
+	if err2 != nil {
+		t.Fatalf("error opening a stub database connection: %s", err2)
+	}
+	defer db2.Close()
+
+	columns := []string{"hostgroup", "srv_host", "srv_port", "status", "ConnUsed", "ConnFree", "ConnOK", "ConnERR",
+		"Queries", "Bytes_data_sent", "Bytes_data_recv", "Latency_us"}
+	rows := sqlmock.NewRows(columns).AddRow("0", "10.91.142.80", "3306", "ONLINE", "0", "45", "1895677", "46", "197941647", "10984550806", "321063484988", "163")
+	mock2.ExpectQuery(sanitizeQuery(mySQLconnectionPoolQuery)).WillReturnRows(rows)
+
+	ch2 := make(chan prometheus.Metric)
+	go func() {
+		scrapeMySQLConnectionPool(db2, ch2)
+		close(ch2)
+	}()
+
+	_ = *readMetric(<-ch2)
+}
+
 func TestScrapeMySQLConnectionList(t *testing.T) {
 	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func() {
 		for c, m := range mySQLconnectionListMetrics {
@@ -263,6 +339,44 @@ func TestScrapeMySQLConnectionList(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
+}
+
+func TestScrapeMySQLConnectionListError(t *testing.T) {
+	db1, mock1, err1 := sqlmock.New()
+	if err1 != nil {
+		t.Fatalf("error opening a stub database connection: %s", err1)
+	}
+	defer db1.Close()
+
+	mock1.ExpectQuery(mySQLConnectionListQuery).WillReturnError(errors.New("an error"))
+	ch1 := make(chan prometheus.Metric)
+
+	go func() {
+		scrapeMySQLConnectionList(db1, ch1)
+		close(ch1)
+	}()
+
+	mySQLconnectionListMetrics = map[string]*metric{
+		"client_connection_list": {},
+	}
+
+	db2, mock2, err2 := sqlmock.New()
+	if err2 != nil {
+		t.Fatalf("error opening a stub database connection: %s", err2)
+	}
+	defer db2.Close()
+
+	columns := []string{"connection_count", "cli_host"}
+	rows := sqlmock.NewRows(columns).AddRow("10", "10.91.142.80")
+	mock2.ExpectQuery(sanitizeQuery(mySQLConnectionListQuery)).WillReturnRows(rows)
+
+	ch2 := make(chan prometheus.Metric)
+	go func() {
+		scrapeMySQLConnectionList(db2, ch2)
+		close(ch2)
+	}()
+
+	_ = *readMetric(<-ch2)
 }
 
 func TestExporter(t *testing.T) {
