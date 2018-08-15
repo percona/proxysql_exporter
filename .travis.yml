@@ -8,7 +8,7 @@ go:
   - 1.10.x
 
 env:
-  - PROXYSQL_IMAGE=percona/proxysql:1.2.1
+  - PROXYSQL_IMAGE=percona/proxysql:1.4
   - PROXYSQL_IMAGE=perconalab/proxysql:1.3.6
 
 services:
