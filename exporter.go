@@ -144,12 +144,14 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 	}(time.Now())
 
 	db, err := e.db()
+	if db != nil {
+		defer db.Close()
+	}
 	if err != nil {
 		log.Errorln("Error opening connection to ProxySQL:", err)
 		e.proxysqlUp.Set(0)
 		return
 	}
-	defer db.Close()
 	e.proxysqlUp.Set(1)
 
 	if e.scrapeMySQLGlobal {
