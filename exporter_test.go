@@ -452,9 +452,9 @@ SAVE MYSQL USERS TO DISK;
 		}
 
 		for _, m := range metrics {
-			convey.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
+			cv.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
 			for k := range m.labels {
-				convey.So(k, convey.ShouldEqual, strings.ToLower(k))
+				cv.So(k, convey.ShouldEqual, strings.ToLower(k))
 			}
 		}
 
