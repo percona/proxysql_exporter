@@ -79,10 +79,10 @@ func sanitizeQuery(q string) string {
 }
 
 func TestScrapeMySQLGlobal(t *testing.T) {
-	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func() {
+	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func(cv convey.C) {
 		for c, m := range mySQLGlobalMetrics {
-			convey.So(c, convey.ShouldEqual, strings.ToLower(c))
-			convey.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
+			cv.So(c, convey.ShouldEqual, strings.ToLower(c))
+			cv.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
 		}
 	})
 
@@ -118,10 +118,10 @@ func TestScrapeMySQLGlobal(t *testing.T) {
 		{"proxysql_mysql_status_client_connections_created", prometheus.Labels{}, 1087931, dto.MetricType_COUNTER},
 		{"proxysql_mysql_status_servers_table_version", prometheus.Labels{}, 2019470, dto.MetricType_UNTYPED},
 	}
-	convey.Convey("Metrics comparison", t, convey.FailureContinues, func() {
+	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
 		for _, expect := range counterExpected {
 			got := *readMetric(<-ch)
-			convey.So(got, convey.ShouldResemble, expect)
+			cv.So(got, convey.ShouldResemble, expect)
 		}
 	})
 
@@ -166,10 +166,10 @@ func TestScrapeMySQLGlobalError(t *testing.T) {
 }
 
 func TestScrapeMySQLConnectionPool(t *testing.T) {
-	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func() {
+	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func(cv convey.C) {
 		for c, m := range mySQLconnectionPoolMetrics {
-			convey.So(c, convey.ShouldEqual, strings.ToLower(c))
-			convey.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
+			cv.So(c, convey.ShouldEqual, strings.ToLower(c))
+			cv.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
 		}
 	})
 
@@ -237,10 +237,10 @@ func TestScrapeMySQLConnectionPool(t *testing.T) {
 		{"proxysql_connection_pool_bytes_data_recv", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, 420795691329, dto.MetricType_COUNTER},
 		{"proxysql_connection_pool_latency_us", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, 283, dto.MetricType_GAUGE},
 	}
-	convey.Convey("Metrics comparison", t, convey.FailureContinues, func() {
+	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
 		for _, expect := range counterExpected {
 			got := *readMetric(<-ch)
-			convey.So(got, convey.ShouldResemble, expect)
+			cv.So(got, convey.ShouldResemble, expect)
 		}
 	})
 
@@ -294,10 +294,10 @@ func TestScrapeMySQLConnectionPoolError(t *testing.T) {
 }
 
 func TestScrapeMySQLConnectionList(t *testing.T) {
-	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func() {
+	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func(cv convey.C) {
 		for c, m := range mySQLconnectionListMetrics {
-			convey.So(c, convey.ShouldEqual, strings.ToLower(c))
-			convey.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
+			cv.So(c, convey.ShouldEqual, strings.ToLower(c))
+			cv.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
 		}
 	})
 
@@ -330,10 +330,10 @@ func TestScrapeMySQLConnectionList(t *testing.T) {
 		{"proxysql_processlist_client_connection_list", prometheus.Labels{"client_host": "10.91.142.89"}, 25, dto.MetricType_GAUGE},
 	}
 
-	convey.Convey("Metrics comparison", t, convey.FailureContinues, func() {
+	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
 		for _, expect := range counterExpected {
 			got := *readMetric(<-ch)
-			convey.So(got, convey.ShouldResemble, expect)
+			cv.So(got, convey.ShouldResemble, expect)
 		}
 	})
 
@@ -421,7 +421,7 @@ SAVE MYSQL USERS TO DISK;
 		break
 	}
 
-	convey.Convey("Metrics descriptions", t, convey.FailureContinues, func() {
+	convey.Convey("Metrics descriptions", t, convey.FailureContinues, func(cv convey.C) {
 		ch := make(chan *prometheus.Desc)
 		go func() {
 			exporter.Describe(ch)
@@ -433,11 +433,11 @@ SAVE MYSQL USERS TO DISK;
 			descs[d.String()] = struct{}{}
 		}
 
-		convey.So(descs, convey.ShouldContainKey,
+		cv.So(descs, convey.ShouldContainKey,
 			`Desc{fqName: "proxysql_connection_pool_latency_us", help: "The currently ping time in microseconds, as reported from Monitor.", constLabels: {}, variableLabels: [hostgroup endpoint]}`)
 	})
 
-	convey.Convey("Metrics data", t, convey.FailureContinues, func() {
+	convey.Convey("Metrics data", t, convey.FailureContinues, func(cv convey.C) {
 		ch := make(chan prometheus.Metric)
 		go func() {
 			exporter.Collect(ch)
@@ -458,9 +458,9 @@ SAVE MYSQL USERS TO DISK;
 			}
 		}
 
-		convey.So(metricResult{"proxysql_connection_pool_latency_us", prometheus.Labels{"hostgroup": "1", "endpoint": "mysql:3306"}, 0, dto.MetricType_GAUGE},
+		cv.So(metricResult{"proxysql_connection_pool_latency_us", prometheus.Labels{"hostgroup": "1", "endpoint": "mysql:3306"}, 0, dto.MetricType_GAUGE},
 			convey.ShouldBeIn, metrics)
-		convey.So(metricResult{"proxysql_connection_pool_latency_us", prometheus.Labels{"hostgroup": "1", "endpoint": "percona-server:3306"}, 0, dto.MetricType_GAUGE},
+		cv.So(metricResult{"proxysql_connection_pool_latency_us", prometheus.Labels{"hostgroup": "1", "endpoint": "percona-server:3306"}, 0, dto.MetricType_GAUGE},
 			convey.ShouldBeIn, metrics)
 	})
 }
