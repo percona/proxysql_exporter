@@ -39,6 +39,7 @@ var (
 
 	mysqlStatusF         = flag.Bool("collect.mysql_status", true, "Collect from stats_mysql_global (SHOW MYSQL STATUS).")
 	mysqlConnectionPoolF = flag.Bool("collect.mysql_connection_pool", true, "Collect from stats_mysql_connection_pool.")
+	mysqlConnectionListF = flag.Bool("collect.mysql_connection_list", true, "Collect connection list from stats_mysql_processlist.")
 )
 
 func main() {
@@ -64,7 +65,7 @@ func main() {
 
 	log.Infof("Starting %s %s for %s", program, version.Version, dsn)
 
-	exporter := NewExporter(dsn, *mysqlStatusF, *mysqlConnectionPoolF)
+	exporter := NewExporter(dsn, *mysqlStatusF, *mysqlConnectionPoolF, *mysqlConnectionListF)
 	prometheus.MustRegister(exporter)
 
 	exporter_shared.RunServer("ProxySQL", *listenAddressF, *telemetryPathF, promhttp.ContinueOnError)

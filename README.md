@@ -40,6 +40,7 @@ Note, using `stats` user requires ProxySQL 1.2.4 or higher. Otherwise, use `admi
 Name                          | Description
 ------------------------------|------------
 collect.mysql_connection_pool | Collect from stats_mysql_connection_pool.
+collect.mysql_connection_list | Collect connection list from stats_mysql_processlist.
 collect.mysql_status          | Collect from stats_mysql_global (SHOW MYSQL STATUS).
 
 
