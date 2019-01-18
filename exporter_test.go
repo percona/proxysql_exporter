@@ -15,6 +15,7 @@
 package main
 
 import (
+	"errors"
 	"regexp"
 	"strings"
 	"testing"
@@ -78,10 +79,10 @@ func sanitizeQuery(q string) string {
 }
 
 func TestScrapeMySQLGlobal(t *testing.T) {
-	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func() {
+	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func(cv convey.C) {
 		for c, m := range mySQLGlobalMetrics {
-			convey.So(c, convey.ShouldEqual, strings.ToLower(c))
-			convey.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
+			cv.So(c, convey.ShouldEqual, strings.ToLower(c))
+			cv.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
 		}
 	})
 
@@ -117,10 +118,10 @@ func TestScrapeMySQLGlobal(t *testing.T) {
 		{"proxysql_mysql_status_client_connections_created", prometheus.Labels{}, 1087931, dto.MetricType_COUNTER},
 		{"proxysql_mysql_status_servers_table_version", prometheus.Labels{}, 2019470, dto.MetricType_UNTYPED},
 	}
-	convey.Convey("Metrics comparison", t, convey.FailureContinues, func() {
+	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
 		for _, expect := range counterExpected {
 			got := *readMetric(<-ch)
-			convey.So(got, convey.ShouldResemble, expect)
+			cv.So(got, convey.ShouldResemble, expect)
 		}
 	})
 
@@ -130,11 +131,45 @@ func TestScrapeMySQLGlobal(t *testing.T) {
 	}
 }
 
+func TestScrapeMySQLGlobalError(t *testing.T) {
+	db1, mock1, err1 := sqlmock.New()
+	if err1 != nil {
+		t.Fatalf("error opening a stub database connection: %s", err1)
+	}
+	defer db1.Close()
+
+	mock1.ExpectQuery(mySQLGlobalQuery).WillReturnError(errors.New("an error"))
+	ch1 := make(chan prometheus.Metric)
+
+	go func() {
+		scrapeMySQLGlobal(db1, ch1)
+		close(ch1)
+	}()
+
+	db2, mock2, err2 := sqlmock.New()
+	if err2 != nil {
+		t.Fatalf("error opening a stub database connection: %s", err2)
+	}
+	defer db2.Close()
+
+	columns := []string{"Variable_Name", "Variable_Value"}
+	rows := sqlmock.NewRows(columns).AddRow("Active_Transactions", "3")
+	mock2.ExpectQuery(sanitizeQuery(mySQLGlobalQuery)).WillReturnRows(rows)
+
+	ch2 := make(chan prometheus.Metric)
+	go func() {
+		scrapeMySQLGlobal(db2, ch2)
+		close(ch2)
+	}()
+
+	_ = *readMetric(<-ch2)
+}
+
 func TestScrapeMySQLConnectionPool(t *testing.T) {
-	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func() {
+	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func(cv convey.C) {
 		for c, m := range mySQLconnectionPoolMetrics {
-			convey.So(c, convey.ShouldEqual, strings.ToLower(c))
-			convey.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
+			cv.So(c, convey.ShouldEqual, strings.ToLower(c))
+			cv.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
 		}
 	})
 
@@ -202,10 +237,10 @@ func TestScrapeMySQLConnectionPool(t *testing.T) {
 		{"proxysql_connection_pool_bytes_data_recv", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, 420795691329, dto.MetricType_COUNTER},
 		{"proxysql_connection_pool_latency_us", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, 283, dto.MetricType_GAUGE},
 	}
-	convey.Convey("Metrics comparison", t, convey.FailureContinues, func() {
+	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
 		for _, expect := range counterExpected {
 			got := *readMetric(<-ch)
-			convey.So(got, convey.ShouldResemble, expect)
+			cv.So(got, convey.ShouldResemble, expect)
 		}
 	})
 
@@ -215,13 +250,144 @@ func TestScrapeMySQLConnectionPool(t *testing.T) {
 	}
 }
 
+func TestScrapeMySQLConnectionPoolError(t *testing.T) {
+	db1, mock1, err1 := sqlmock.New()
+	if err1 != nil {
+		t.Fatalf("error opening a stub database connection: %s", err1)
+	}
+	defer db1.Close()
+
+	mock1.ExpectQuery(mySQLconnectionPoolQuery).WillReturnError(errors.New("an error"))
+	ch1 := make(chan prometheus.Metric)
+
+	go func() {
+		scrapeMySQLConnectionPool(db1, ch1)
+		close(ch1)
+	}()
+
+	mySQLconnectionPoolMetrics = map[string]*metric{
+		"hostgroup": {},
+		"latency_us": {"latency_us", prometheus.GaugeValue,
+			"The currently ping time in microseconds, as reported from Monitor."},
+		"latency_ms": {"latency_us", prometheus.GaugeValue,
+			"The currently ping time in microseconds, as reported from Monitor."},
+	}
+
+	db2, mock2, err2 := sqlmock.New()
+	if err2 != nil {
+		t.Fatalf("error opening a stub database connection: %s", err2)
+	}
+	defer db2.Close()
+
+	columns := []string{"hostgroup", "srv_host", "srv_port", "status", "ConnUsed", "ConnFree", "ConnOK", "ConnERR",
+		"Queries", "Bytes_data_sent", "Bytes_data_recv", "Latency_us"}
+	rows := sqlmock.NewRows(columns).AddRow("0", "10.91.142.80", "3306", "ONLINE", "0", "45", "1895677", "46", "197941647", "10984550806", "321063484988", "163")
+	mock2.ExpectQuery(sanitizeQuery(mySQLconnectionPoolQuery)).WillReturnRows(rows)
+
+	ch2 := make(chan prometheus.Metric)
+	go func() {
+		scrapeMySQLConnectionPool(db2, ch2)
+		close(ch2)
+	}()
+
+	_ = *readMetric(<-ch2)
+}
+
+func TestScrapeMySQLConnectionList(t *testing.T) {
+	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func(cv convey.C) {
+		for c, m := range mySQLconnectionListMetrics {
+			cv.So(c, convey.ShouldEqual, strings.ToLower(c))
+			cv.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
+		}
+	})
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("error opening a stub database connection: %s", err)
+	}
+	defer db.Close()
+
+	columns := []string{"connection_count", "cli_host"}
+	rows := sqlmock.NewRows(columns).
+		AddRow("10", "10.91.142.80").
+		AddRow("15", "10.91.142.82").
+		AddRow("20", "10.91.142.88").
+		AddRow("25", "10.91.142.89")
+	mock.ExpectQuery(sanitizeQuery(mySQLConnectionListQuery)).WillReturnRows(rows)
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		if err = scrapeMySQLConnectionList(db, ch); err != nil {
+			t.Errorf("error calling function on test: %s", err)
+		}
+		close(ch)
+	}()
+
+	counterExpected := []metricResult{
+		{"proxysql_processlist_client_connection_list", prometheus.Labels{"client_host": "10.91.142.80"}, 10, dto.MetricType_GAUGE},
+		{"proxysql_processlist_client_connection_list", prometheus.Labels{"client_host": "10.91.142.82"}, 15, dto.MetricType_GAUGE},
+		{"proxysql_processlist_client_connection_list", prometheus.Labels{"client_host": "10.91.142.88"}, 20, dto.MetricType_GAUGE},
+		{"proxysql_processlist_client_connection_list", prometheus.Labels{"client_host": "10.91.142.89"}, 25, dto.MetricType_GAUGE},
+	}
+
+	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
+		for _, expect := range counterExpected {
+			got := *readMetric(<-ch)
+			cv.So(got, convey.ShouldResemble, expect)
+		}
+	})
+
+	// Ensure all SQL queries were executed
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+func TestScrapeMySQLConnectionListError(t *testing.T) {
+	db1, mock1, err1 := sqlmock.New()
+	if err1 != nil {
+		t.Fatalf("error opening a stub database connection: %s", err1)
+	}
+	defer db1.Close()
+
+	mock1.ExpectQuery(mySQLConnectionListQuery).WillReturnError(errors.New("an error"))
+	ch1 := make(chan prometheus.Metric)
+
+	go func() {
+		scrapeMySQLConnectionList(db1, ch1)
+		close(ch1)
+	}()
+
+	mySQLconnectionListMetrics = map[string]*metric{
+		"client_connection_list": {},
+	}
+
+	db2, mock2, err2 := sqlmock.New()
+	if err2 != nil {
+		t.Fatalf("error opening a stub database connection: %s", err2)
+	}
+	defer db2.Close()
+
+	columns := []string{"connection_count", "cli_host"}
+	rows := sqlmock.NewRows(columns).AddRow("10", "10.91.142.80")
+	mock2.ExpectQuery(sanitizeQuery(mySQLConnectionListQuery)).WillReturnRows(rows)
+
+	ch2 := make(chan prometheus.Metric)
+	go func() {
+		scrapeMySQLConnectionList(db2, ch2)
+		close(ch2)
+	}()
+
+	_ = *readMetric(<-ch2)
+}
+
 func TestExporter(t *testing.T) {
 	if testing.Short() {
 		t.Skip("-short is passed, skipping integration test")
 	}
 
 	// wait up to 30 seconds for ProxySQL to become available
-	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true)
+	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true)
 	for i := 0; i < 30; i++ {
 		db, err := exporter.db()
 		if err != nil {
@@ -255,7 +421,7 @@ SAVE MYSQL USERS TO DISK;
 		break
 	}
 
-	convey.Convey("Metrics descriptions", t, convey.FailureContinues, func() {
+	convey.Convey("Metrics descriptions", t, convey.FailureContinues, func(cv convey.C) {
 		ch := make(chan *prometheus.Desc)
 		go func() {
 			exporter.Describe(ch)
@@ -267,11 +433,11 @@ SAVE MYSQL USERS TO DISK;
 			descs[d.String()] = struct{}{}
 		}
 
-		convey.So(descs, convey.ShouldContainKey,
+		cv.So(descs, convey.ShouldContainKey,
 			`Desc{fqName: "proxysql_connection_pool_latency_us", help: "The currently ping time in microseconds, as reported from Monitor.", constLabels: {}, variableLabels: [hostgroup endpoint]}`)
 	})
 
-	convey.Convey("Metrics data", t, convey.FailureContinues, func() {
+	convey.Convey("Metrics data", t, convey.FailureContinues, func(cv convey.C) {
 		ch := make(chan prometheus.Metric)
 		go func() {
 			exporter.Collect(ch)
@@ -286,15 +452,15 @@ SAVE MYSQL USERS TO DISK;
 		}
 
 		for _, m := range metrics {
-			convey.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
+			cv.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
 			for k := range m.labels {
-				convey.So(k, convey.ShouldEqual, strings.ToLower(k))
+				cv.So(k, convey.ShouldEqual, strings.ToLower(k))
 			}
 		}
 
-		convey.So(metricResult{"proxysql_connection_pool_latency_us", prometheus.Labels{"hostgroup": "1", "endpoint": "mysql:3306"}, 0, dto.MetricType_GAUGE},
+		cv.So(metricResult{"proxysql_connection_pool_latency_us", prometheus.Labels{"hostgroup": "1", "endpoint": "mysql:3306"}, 0, dto.MetricType_GAUGE},
 			convey.ShouldBeIn, metrics)
-		convey.So(metricResult{"proxysql_connection_pool_latency_us", prometheus.Labels{"hostgroup": "1", "endpoint": "percona-server:3306"}, 0, dto.MetricType_GAUGE},
+		cv.So(metricResult{"proxysql_connection_pool_latency_us", prometheus.Labels{"hostgroup": "1", "endpoint": "percona-server:3306"}, 0, dto.MetricType_GAUGE},
 			convey.ShouldBeIn, metrics)
 	})
 }
