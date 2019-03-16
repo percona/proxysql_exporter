@@ -3,8 +3,7 @@
 [![Release](https://github-release-version.herokuapp.com/github/percona/proxysql_exporter/release.svg?style=flat)](https://github.com/percona/proxysql_exporter/releases/latest)
 [![Build Status](https://travis-ci.org/percona/proxysql_exporter.svg?branch=master)](https://travis-ci.org/percona/proxysql_exporter)
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/proxysql_exporter)](https://goreportcard.com/report/github.com/percona/proxysql_exporter)
-[![CLA assistant](https://cla-assistant.io/readme/badge/percona/proxysql_exporter)](https://cla-assistant.io/percona/proxysql_exporter)
-
+[![CLA assistant](https://cla-assistant.percona.com/readme/badge/percona/proxysql_exporter)](https://cla-assistant.percona.com/percona/proxysql_exporter)
 Prometheus exporter for [ProxySQL](https://github.com/sysown/proxysql) performance data.
 Supported versions: 1.2 and 1.3.
 
