@@ -10,12 +10,23 @@ Supported versions: 1.2 and 1.3.
 
 ## Building and running
 
+### Prerequisites:
+
+* [Go compiler](https://golang.org/dl/)
+
 ### Building
 
-```bash
-make
-```
-
+1. Get the code from the Percona repository:
+ 
+    ```bash
+    go get github.com/percona/proxysql_exporter
+    ```
+ 2. Switch to the buld directory and run ``make``:
+ 
+    ```bash
+    cd ${GOPATH-$HOME/go}/src/github.com/percona/proxysql_exporter
+    make
+    ```
 
 ### Running
 
@@ -32,7 +43,6 @@ export HTTP_AUTH='user:password'
 ```
 
 Note, using `stats` user requires ProxySQL 1.2.4 or higher. Otherwise, use `admin` user.
-
 
 ### Collector Flags
 
