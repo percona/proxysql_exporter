@@ -396,7 +396,7 @@ func TestScrapeDetailedConnectionList(t *testing.T) {
 	}
 	defer db.Close()
 
-	columns := []string{"user", "db" ,"cli_host", "hostgroup", "count"}
+	columns := []string{"user", "db", "cli_host", "hostgroup", "count"}
 	rows := sqlmock.NewRows(columns).
 		AddRow("user_1", "database_1", "10.91.142.80", "1001", 1).
 		AddRow("user_2", "database_2", "10.91.142.82", "1002", 2).
@@ -432,6 +432,66 @@ func TestScrapeDetailedConnectionList(t *testing.T) {
 	}
 }
 
+func TestScrapeMemoryMetrics(t *testing.T) {
+	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func(cv convey.C) {
+		for c, m := range memoryMetricsMetrics {
+			cv.So(c, convey.ShouldEqual, strings.ToLower(c))
+			cv.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
+		}
+	})
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("error opening a stub database connection: %s", err)
+	}
+	defer db.Close()
+
+	columns := []string{"Variable_Name", "Variable_Value"}
+	rows := sqlmock.NewRows(columns).
+		AddRow("stack_memory_admin_threads", "32541").
+		AddRow("query_digest_memory", "7314")
+	mock.ExpectQuery(sanitizeQuery(memoryMetricsQuery)).WillReturnRows(rows)
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		if err = scrapeMemoryMetrics(db, ch); err != nil {
+			t.Errorf("error calling function on test: %s", err)
+		}
+		close(ch)
+	}()
+
+	counterExpected := []metricResult{
+		{"proxysql_stats_memory_stack_memory_admin_threads", prometheus.Labels{}, 32541, dto.MetricType_UNTYPED},
+		{"proxysql_stats_memory_query_digest_memory", prometheus.Labels{}, 7314, dto.MetricType_GAUGE},
+	}
+
+	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
+		for _, expect := range counterExpected {
+			got := *readMetric(<-ch)
+			cv.So(got, convey.ShouldResemble, expect)
+		}
+	})
+
+	// Ensure all SQL queries were executed
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+func TestScrapeMemoryMetricsError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("error opening a stub database connection: %s", err)
+	}
+	defer db.Close()
+
+	mock.ExpectQuery(sanitizeQuery(memoryMetricsQuery)).WillReturnError(errors.New("error"))
+
+	ch := make(chan prometheus.Metric)
+	err = scrapeMemoryMetrics(db, ch)
+	assert.Error(t, err)
+}
+
 func TestScrapeDetailedConnectionLisError(t *testing.T) {
 	t.Run("error on sql query", func(t *testing.T) {
 		db, mock, err := sqlmock.New()
@@ -455,7 +515,7 @@ func TestExporter(t *testing.T) {
 	}
 
 	// wait up to 30 seconds for ProxySQL to become available
-	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true, true)
+	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true, true, true)
 	for i := 0; i < 30; i++ {
 		db, err := exporter.db()
 		if err != nil {
