@@ -19,9 +19,9 @@ Supported versions: 1.2 and 1.3.
 1. Get the code from the Percona repository:
  
     ```bash
-    go get github.com/percona/proxysql_exporter
+    go get -u github.com/percona/proxysql_exporter
     ```
- 2. Switch to the buld directory and run ``make``:
+ 2. Switch to the buld directory and run `make`:
  
     ```bash
     cd ${GOPATH-$HOME/go}/src/github.com/percona/proxysql_exporter
