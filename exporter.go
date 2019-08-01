@@ -42,7 +42,7 @@ type Exporter struct {
 }
 
 // NewExporter returns a new ProxySQL exporter for the provided DSN.
-// It scrapes stats_mysql_global and stats_mysql_connection_pool if corresponding parameters are true.
+// It scrapes stats_mysql_global, stats_mysql_connection_pool and stats_mysql_processlist if corresponding parameters are true.
 func NewExporter(dsn string, scrapeMySQLGlobal bool, scrapeMySQLConnectionPool bool, scrapeMySQLConnectionList bool, scrapeDetailedMySQLProcessList bool) *Exporter {
 	return &Exporter{
 		dsn:                            dsn,
@@ -434,6 +434,7 @@ func scrapeDetailedMySQLConnectionList(db *sql.DB, ch chan<- prometheus.Metric) 
 	}
 	defer rows.Close()
 
+
 	for rows.Next() {
 		var res processListResult
 
@@ -457,7 +458,7 @@ func scrapeDetailedMySQLConnectionList(db *sql.DB, ch chan<- prometheus.Metric) 
 		)
 	}
 
-	return nil
+	return rows.Err()
 }
 
 // check interface

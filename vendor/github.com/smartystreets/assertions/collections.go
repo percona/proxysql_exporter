@@ -227,7 +227,7 @@ func ShouldHaveLength(actual interface{}, expected ...interface{}) string {
 		if int64(value.Len()) == expectedLen {
 			return success
 		} else {
-			return fmt.Sprintf(shouldHaveHadLength, expectedLen, value.Len(), actual)
+			return fmt.Sprintf(shouldHaveHadLength, actual, value.Len(), expectedLen)
 		}
 	case reflect.Ptr:
 		elem := value.Elem()
@@ -236,7 +236,7 @@ func ShouldHaveLength(actual interface{}, expected ...interface{}) string {
 			if int64(elem.Len()) == expectedLen {
 				return success
 			} else {
-				return fmt.Sprintf(shouldHaveHadLength, expectedLen, elem.Len(), actual)
+				return fmt.Sprintf(shouldHaveHadLength, actual, elem.Len(), expectedLen)
 			}
 		}
 	}
