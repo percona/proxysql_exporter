@@ -42,7 +42,7 @@ type Exporter struct {
 	proxysqlUp                     prometheus.Gauge
 }
 
-// It scrapes stats_mysql_global and stats_mysql_connection_pool if corresponding parameters are true.
+// NewExporter It scrapes stats_mysql_global and stats_mysql_connection_pool if corresponding parameters are true.
 func NewExporter(dsn string, scrapeMySQLGlobal bool, scrapeMySQLConnectionPool bool, scrapeMySQLConnectionList bool, scrapeDetailedMySQLProcessList bool, scrapeMemoryMetrics bool) *Exporter {
 	return &Exporter{
 		dsn:                            dsn,
