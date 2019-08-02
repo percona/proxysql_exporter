@@ -42,7 +42,6 @@ type Exporter struct {
 	proxysqlUp                     prometheus.Gauge
 }
 
-// NewExporter returns a new ProxySQL exporter for the provided DSN.
 // It scrapes stats_mysql_global and stats_mysql_connection_pool if corresponding parameters are true.
 func NewExporter(dsn string, scrapeMySQLGlobal bool, scrapeMySQLConnectionPool bool, scrapeMySQLConnectionList bool, scrapeDetailedMySQLProcessList bool, scrapeMemoryMetrics bool) *Exporter {
 	return &Exporter{
@@ -442,6 +441,7 @@ func scrapeDetailedMySQLConnectionList(db *sql.DB, ch chan<- prometheus.Metric) 
 	}
 	defer rows.Close()
 
+
 	for rows.Next() {
 		var res processListResult
 
@@ -465,7 +465,7 @@ func scrapeDetailedMySQLConnectionList(db *sql.DB, ch chan<- prometheus.Metric) 
 		)
 	}
 
-	return nil
+	return rows.Err()
 }
 
 const memoryMetricsQuery = "select Variable_Name, Variable_Value  from stats_memory_metrics"
