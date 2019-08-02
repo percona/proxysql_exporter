@@ -552,7 +552,7 @@ func scrapeMemoryMetrics(db *sql.DB, ch chan<- prometheus.Metric) error {
 		)
 	}
 
-	return nil
+	return rows.Err()
 }
 
 // check interface
