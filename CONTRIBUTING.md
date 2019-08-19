@@ -12,3 +12,9 @@ export DATA_SOURCE_NAME='admin:admin@tcp(127.0.0.1:16032)/'
 ```
 
 `testall` make target will run integration tests and also leave ProxySQL inside Docker container in configured state.
+
+
+## Vendoring
+
+We use [dep](https://github.com/golang/dep) to vendor dependencies.
+Please use released version of dep (i.e. do not `go get` from `master` branch).
