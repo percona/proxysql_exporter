@@ -87,7 +87,6 @@ var knownFails = map[string]failReason{
 	"fixedbugs/issue15975.go": {desc: "also looks valid but deal with after Go 1.7 support is out?"},
 
 	// These are new tests in Go 1.8.
-	"fixedbugs/issue15528.go": {category: usesUnsupportedPackage, desc: `imports "unsafe" package and gets: Error: reflect: call of reflect.Value.IsNil on unsafe.Pointer Value`}, // See https://github.com/golang/go/commit/dfc56a4cd313c9c5de37f4fadb14912286edc42f for relevant commit.
 	"fixedbugs/issue17381.go": {category: unsureIfGopherJSSupportsThisFeature, desc: "tests runtime.{Callers,FuncForPC} behavior in a deferred func with garbage on stack... does GopherJS even support runtime.{Callers,FuncForPC}?"},
 	"fixedbugs/issue18149.go": {desc: "//line directives with filenames are not correctly parsed, see https://github.com/gopherjs/gopherjs/issues/553."},
 
@@ -105,6 +104,22 @@ var knownFails = map[string]failReason{
 	"fixedbugs/issue22083.go": {category: requiresSourceMapSupport}, // Technically, added in Go 1.9.2.
 	"fixedbugs/issue22660.go": {category: notApplicable, desc: "test of gc compiler, uses os/exec.Command"},
 	"fixedbugs/issue23305.go": {desc: "GopherJS fails to compile println(0xffffffff), maybe because 32-bit arch"},
+
+	// These are new tests in Go 1.11.
+	"fixedbugs/issue21221.go":  {category: usesUnsupportedPackage, desc: "uses unsafe package and compares nil pointers"},
+	"fixedbugs/issue22662.go":  {desc: "line directives not fully working. Error: got /private/var/folders/b8/66r1c5856mqds1mrf2tjtq8w0000gn/T:1; want ??:1"},
+	"fixedbugs/issue22662b.go": {category: usesUnsupportedPackage, desc: "os/exec.Command unsupported"},
+	"fixedbugs/issue23188.go":  {desc: "incorrect order of evaluation of index operations"},
+	"fixedbugs/issue24547.go":  {desc: "incorrect computing method sets with shadowed methods"},
+
+	// These are new tests in Go 1.11.5
+	"fixedbugs/issue28688.go": {category: notApplicable, desc: "testing runtime optimisations"},
+
+	// These are new tests in Go 1.12.
+	"fixedbugs/issue23837.go":  {desc: "missing panic on nil pointer-to-empty-struct dereference"},
+	"fixedbugs/issue27201.go":  {desc: "incorrect stack trace for nil dereference in inlined function"},
+	"fixedbugs/issue27518b.go": {desc: "sigpanic can make dead pointer live again"},
+	"fixedbugs/issue29190.go":  {desc: "append does not fail when length overflows"},
 }
 
 type failCategory uint8

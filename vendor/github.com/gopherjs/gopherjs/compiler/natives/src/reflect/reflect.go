@@ -53,17 +53,34 @@ func reflectType(typ *js.Object) *rtype {
 			if typ.Get("named").Bool() {
 				rt.tflag |= tflagNamed
 			}
-			reflectMethods := make([]method, methodSet.Length())
-			for i := range reflectMethods {
+			var reflectMethods []method
+			for i := 0; i < methodSet.Length(); i++ { // Exported methods first.
 				m := methodSet.Index(i)
-				reflectMethods[i] = method{
-					name: newNameOff(newName(internalStr(m.Get("name")), "", internalStr(m.Get("pkg")) == "")),
-					mtyp: newTypeOff(reflectType(m.Get("typ"))),
+				exported := internalStr(m.Get("pkg")) == ""
+				if !exported {
+					continue
 				}
+				reflectMethods = append(reflectMethods, method{
+					name: newNameOff(newName(internalStr(m.Get("name")), "", exported)),
+					mtyp: newTypeOff(reflectType(m.Get("typ"))),
+				})
+			}
+			xcount := uint16(len(reflectMethods))
+			for i := 0; i < methodSet.Length(); i++ { // Unexported methods second.
+				m := methodSet.Index(i)
+				exported := internalStr(m.Get("pkg")) == ""
+				if exported {
+					continue
+				}
+				reflectMethods = append(reflectMethods, method{
+					name: newNameOff(newName(internalStr(m.Get("name")), "", exported)),
+					mtyp: newTypeOff(reflectType(m.Get("typ"))),
+				})
 			}
 			ut := &uncommonType{
 				pkgPath:  newNameOff(newName(internalStr(typ.Get("pkg")), "", false)),
 				mcount:   uint16(methodSet.Length()),
+				xcount:   xcount,
 				_methods: reflectMethods,
 			}
 			uncommonTypeMap[rt] = ut
@@ -143,14 +160,14 @@ func reflectType(typ *js.Object) *rtype {
 			reflectFields := make([]structField, fields.Length())
 			for i := range reflectFields {
 				f := fields.Index(i)
-				offsetAnon := uintptr(i) << 1
-				if f.Get("anonymous").Bool() {
-					offsetAnon |= 1
+				offsetEmbed := uintptr(i) << 1
+				if f.Get("embedded").Bool() {
+					offsetEmbed |= 1
 				}
 				reflectFields[i] = structField{
-					name:       newName(internalStr(f.Get("name")), internalStr(f.Get("tag")), f.Get("exported").Bool()),
-					typ:        reflectType(f.Get("typ")),
-					offsetAnon: offsetAnon,
+					name:        newName(internalStr(f.Get("name")), internalStr(f.Get("tag")), f.Get("exported").Bool()),
+					typ:         reflectType(f.Get("typ")),
+					offsetEmbed: offsetEmbed,
 				}
 			}
 			setKindType(rt, &structType{
@@ -172,15 +189,18 @@ func setKindType(rt *rtype, kindType interface{}) {
 type uncommonType struct {
 	pkgPath nameOff
 	mcount  uint16
-	_       uint16
+	xcount  uint16
 	moff    uint32
-	_       uint32
 
 	_methods []method
 }
 
 func (t *uncommonType) methods() []method {
 	return t._methods
+}
+
+func (t *uncommonType) exportedMethods() []method {
+	return t._methods[:t.xcount:t.xcount]
 }
 
 var uncommonTypeMap = make(map[*rtype]*uncommonType)
@@ -530,20 +550,67 @@ type mapIter struct {
 	m    *js.Object
 	keys *js.Object
 	i    int
+
+	// last is the last object the iterator indicates. If this object exists, the functions that return the
+	// current key or value returns this object, regardless of the current iterator. It is because the current
+	// iterator might be stale due to key deletion in a loop.
+	last *js.Object
 }
 
-func mapiterinit(t *rtype, m unsafe.Pointer) *byte {
-	return (*byte)(unsafe.Pointer(&mapIter{t, js.InternalObject(m), js.Global.Call("$keys", js.InternalObject(m)), 0}))
+func (iter *mapIter) skipUntilValidKey() {
+	for iter.i < iter.keys.Length() {
+		k := iter.keys.Index(iter.i)
+		if iter.m.Get(k.String()) != js.Undefined {
+			break
+		}
+		// The key is already deleted. Move on the next item.
+		iter.i++
+	}
 }
 
-func mapiterkey(it *byte) unsafe.Pointer {
-	iter := (*mapIter)(unsafe.Pointer(it))
-	k := iter.keys.Index(iter.i)
-	return unsafe.Pointer(js.Global.Call("$newDataPointer", iter.m.Get(k.String()).Get("k"), jsType(PtrTo(iter.t.Key()))).Unsafe())
+func mapiterinit(t *rtype, m unsafe.Pointer) unsafe.Pointer {
+	return unsafe.Pointer(&mapIter{t, js.InternalObject(m), js.Global.Call("$keys", js.InternalObject(m)), 0, nil})
 }
 
-func mapiternext(it *byte) {
-	iter := (*mapIter)(unsafe.Pointer(it))
+func mapiterkey(it unsafe.Pointer) unsafe.Pointer {
+	iter := (*mapIter)(it)
+	var kv *js.Object
+	if iter.last != nil {
+		kv = iter.last
+	} else {
+		iter.skipUntilValidKey()
+		if iter.i == iter.keys.Length() {
+			return nil
+		}
+		k := iter.keys.Index(iter.i)
+		kv = iter.m.Get(k.String())
+
+		// Record the key-value pair for later accesses.
+		iter.last = kv
+	}
+	return unsafe.Pointer(js.Global.Call("$newDataPointer", kv.Get("k"), jsType(PtrTo(iter.t.Key()))).Unsafe())
+}
+
+func mapitervalue(it unsafe.Pointer) unsafe.Pointer {
+	iter := (*mapIter)(it)
+	var kv *js.Object
+	if iter.last != nil {
+		kv = iter.last
+	} else {
+		iter.skipUntilValidKey()
+		if iter.i == iter.keys.Length() {
+			return nil
+		}
+		k := iter.keys.Index(iter.i)
+		kv = iter.m.Get(k.String())
+		iter.last = kv
+	}
+	return unsafe.Pointer(js.Global.Call("$newDataPointer", kv.Get("v"), jsType(PtrTo(iter.t.Elem()))).Unsafe())
+}
+
+func mapiternext(it unsafe.Pointer) {
+	iter := (*mapIter)(it)
+	iter.last = nil
 	iter.i++
 }
 
@@ -627,7 +694,7 @@ func Copy(dst, src Value) int {
 	return js.Global.Call("$copySlice", dstVal, srcVal).Int()
 }
 
-func methodReceiver(op string, v Value, i int) (_, t *rtype, fn unsafe.Pointer) {
+func methodReceiver(op string, v Value, i int) (_ *rtype, t *funcType, fn unsafe.Pointer) {
 	var prop string
 	if v.typ.Kind() == Interface {
 		tt := (*interfaceType)(unsafe.Pointer(v.typ))
@@ -638,7 +705,7 @@ func methodReceiver(op string, v Value, i int) (_, t *rtype, fn unsafe.Pointer) 
 		if !tt.nameOff(m.name).isExported() {
 			panic("reflect: " + op + " of unexported method")
 		}
-		t = tt.typeOff(m.typ)
+		t = (*funcType)(unsafe.Pointer(tt.typeOff(m.typ)))
 		prop = tt.nameOff(m.name).name()
 	} else {
 		ms := v.typ.exportedMethods()
@@ -649,7 +716,7 @@ func methodReceiver(op string, v Value, i int) (_, t *rtype, fn unsafe.Pointer) 
 		if !v.typ.nameOff(m.name).isExported() {
 			panic("reflect: " + op + " of unexported method")
 		}
-		t = v.typ.typeOff(m.mtyp)
+		t = (*funcType)(unsafe.Pointer(v.typ.typeOff(m.mtyp)))
 		prop = js.Global.Call("$methodSet", jsType(v.typ)).Index(i).Get("prop").String()
 	}
 	rcvr := v.object()
@@ -829,7 +896,7 @@ var callHelper = js.Global.Get("$call").Interface().(func(...interface{}) *js.Ob
 
 func (v Value) call(op string, in []Value) []Value {
 	var (
-		t    *rtype
+		t    *funcType
 		fn   unsafe.Pointer
 		rcvr *js.Object
 	)
@@ -840,7 +907,7 @@ func (v Value) call(op string, in []Value) []Value {
 			rcvr = jsType(v.typ).New(rcvr)
 		}
 	} else {
-		t = v.typ
+		t = (*funcType)(unsafe.Pointer(v.typ))
 		fn = unsafe.Pointer(v.object().Unsafe())
 		rcvr = js.Undefined
 	}
@@ -993,7 +1060,7 @@ func (v Value) Field(i int) Value {
 
 	fl := v.flag&(flagStickyRO|flagIndir|flagAddr) | flag(typ.Kind())
 	if !field.name.isExported() {
-		if field.anon() {
+		if field.embedded() {
 			fl |= flagEmbedRO
 		} else {
 			fl |= flagStickyRO
@@ -1142,6 +1209,8 @@ func (v Value) IsNil() bool {
 		return v.object() == js.InternalObject(false)
 	case Interface:
 		return v.object() == js.Global.Get("$ifaceNil")
+	case UnsafePointer:
+		return v.object().Unsafe() == 0
 	default:
 		panic(&ValueError{"reflect.Value.IsNil", k})
 	}

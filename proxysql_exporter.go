@@ -22,7 +22,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/percona/exporter_shared"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
 	"github.com/prometheus/common/version"
 )
@@ -70,5 +69,5 @@ func main() {
 	exporter := NewExporter(dsn, *mysqlStatusF, *mysqlConnectionPoolF, *mysqlConnectionListF, *mysqlDetailedConnectionListF, *memoryMetricsF)
 	prometheus.MustRegister(exporter)
 
-	exporter_shared.RunServer("ProxySQL", *listenAddressF, *telemetryPathF, promhttp.ContinueOnError)
+	exporter_shared.RunServer("ProxySQL", *listenAddressF, *telemetryPathF, exporter_shared.DefaultMetricsHandler())
 }
