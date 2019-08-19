@@ -36,25 +36,25 @@ Note, using `stats` user requires ProxySQL 1.2.4 or higher. Otherwise, use `admi
 
 ### Collector Flags
 
-Name                          | Description
-------------------------------|------------
-collect.mysql_connection_pool | Collect from stats_mysql_connection_pool.
-collect.mysql_connection_list | Collect connection list from stats_mysql_processlist.
-collect.mysql_status          | Collect from stats_mysql_global (SHOW MYSQL STATUS).
+Name                                       | Description
+-------------------------------------------|------------
+`collect.detailed.stats_mysql_processlist` | Collect detailed connection list from stats_mysql_processlist.
+`collect.mysql_connection_list`            | Collect connection list from stats_mysql_processlist. (default true)
+`collect.mysql_connection_pool`            | Collect from stats_mysql_connection_pool. (default true)
+`collect.mysql_status`                     | Collect from stats_mysql_global (SHOW MYSQL STATUS). (default true)
+`collect.stats_memory_metrics`             | Collect memory metrics from stats_memory_metrics.
 
 
 ### General Flags
 
-Name                                       | Description
--------------------------------------------|--------------------------------------------------------------------------------------------------
-log.format                                 | Set the log target and format. Example: "logger:syslog?appname=bob&local=7" or "logger:stdout?json=true" (default "logger:stderr")
-log.level                                  | Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]
-version                                    | Print version information and exit.
-web.auth-file                              | Path to YAML file with server_user, server_password options for http basic auth (overrides HTTP_AUTH env var).
-web.listen-address                         | Address to listen on for web interface and telemetry. (default ":42004")
-web.ssl-cert-file                          | Path to SSL certificate file.
-web.ssl-key-file                           | Path to SSL key file.
-web.telemetry-path                         | Path under which to expose metrics. (default "/metrics")
+Name                 | Description
+---------------------|------------
+`version`            | Print version information and exit.
+`web.auth-file`      | Path to YAML file with server_user, server_password keys for HTTP Basic authentication (overrides HTTP_AUTH environment variable).
+`web.listen-address` | Address to listen on for web interface and telemetry. (default ":42004")
+`web.ssl-cert-file`  | Path to SSL certificate file.
+`web.ssl-key-file`   | Path to SSL key file.
+`web.telemetry-path` | Path under which to expose metrics. (default "/metrics")
 
 
 ## Visualizing
