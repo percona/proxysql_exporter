@@ -35,12 +35,11 @@ func (d *mockDriver) Open(dsn string) (driver.Conn, error) {
 	return c, nil
 }
 
-// New creates sqlmock database connection and a mock to manage expectations.
-// Accepts options, like ValueConverterOption, to use a ValueConverter from
-// a specific driver.
+// New creates sqlmock database connection
+// and a mock to manage expectations.
 // Pings db so that all expectations could be
 // asserted.
-func New(options ...func(*sqlmock) error) (*sql.DB, Sqlmock, error) {
+func New() (*sql.DB, Sqlmock, error) {
 	pool.Lock()
 	dsn := fmt.Sprintf("sqlmock_db_%d", pool.counter)
 	pool.counter++
@@ -49,13 +48,11 @@ func New(options ...func(*sqlmock) error) (*sql.DB, Sqlmock, error) {
 	pool.conns[dsn] = smock
 	pool.Unlock()
 
-	return smock.open(options)
+	return smock.open()
 }
 
-// NewWithDSN creates sqlmock database connection with a specific DSN
-// and a mock to manage expectations.
-// Accepts options, like ValueConverterOption, to use a ValueConverter from
-// a specific driver.
+// NewWithDSN creates sqlmock database connection
+// with a specific DSN and a mock to manage expectations.
 // Pings db so that all expectations could be asserted.
 //
 // This method is introduced because of sql abstraction
@@ -67,7 +64,7 @@ func New(options ...func(*sqlmock) error) (*sql.DB, Sqlmock, error) {
 //
 // It is not recommended to use this method, unless you
 // really need it and there is no other way around.
-func NewWithDSN(dsn string, options ...func(*sqlmock) error) (*sql.DB, Sqlmock, error) {
+func NewWithDSN(dsn string) (*sql.DB, Sqlmock, error) {
 	pool.Lock()
 	if _, ok := pool.conns[dsn]; ok {
 		pool.Unlock()
@@ -77,5 +74,5 @@ func NewWithDSN(dsn string, options ...func(*sqlmock) error) (*sql.DB, Sqlmock, 
 	pool.conns[dsn] = smock
 	pool.Unlock()
 
-	return smock.open(options)
+	return smock.open()
 }

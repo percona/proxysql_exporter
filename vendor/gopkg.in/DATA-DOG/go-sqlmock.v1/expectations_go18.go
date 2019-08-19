@@ -16,7 +16,7 @@ func (e *ExpectedQuery) WillReturnRows(rows ...*Rows) *ExpectedQuery {
 	for i, r := range rows {
 		sets[i] = r
 	}
-	e.rows = &rowSets{sets: sets, ex: e}
+	e.rows = &rowSets{sets: sets}
 	return e
 }
 
@@ -49,7 +49,7 @@ func (e *queryBasedExpectation) argsMatches(args []namedValue) error {
 		}
 
 		// convert to driver converter
-		darg, err := e.converter.ConvertValue(dval)
+		darg, err := driver.DefaultParameterConverter.ConvertValue(dval)
 		if err != nil {
 			return fmt.Errorf("could not convert %d argument %T - %+v to driver value: %s", k, e.args[k], e.args[k], err)
 		}
