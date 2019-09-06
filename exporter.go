@@ -267,7 +267,7 @@ func scrapeMySQLGlobal(db *sql.DB, ch chan<- prometheus.Metric) error {
 	return rows.Err()
 }
 
-const mySQLconnectionPoolQuery = "SELECT hostgroup, srv_host, srv_port, * FROM stats_mysql_connection_pool"
+const mySQLconnectionPoolQuery = "SELECT * FROM stats_mysql_connection_pool"
 
 // https://github.com/sysown/proxysql/blob/master/doc/admin_tables.md#stats_mysql_connection_pool
 // key - column name in lowercase.
