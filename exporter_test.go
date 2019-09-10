@@ -432,6 +432,78 @@ func TestScrapeDetailedConnectionList(t *testing.T) {
 	}
 }
 
+func TestScrapeCommands(t *testing.T) {
+	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func(cv convey.C) {
+		for c, m := range mysqlCommandCountersMetrics {
+			cv.So(c, convey.ShouldEqual, strings.ToLower(c))
+			cv.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
+		}
+	})
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("error opening a stub database connection: %s", err)
+	}
+	defer db.Close()
+
+	columns := []string{"Command", "Total_Time_us", "Total_cnt", "cnt_100us", "cnt_500us", "cnt_1ms", "cnt_5ms", "cnt_10ms", "cnt_50ms", "cnt_100ms", "cnt_500ms", "cnt_1s", "cnt_5s", "cnt_10s", "cnt_INFs"}
+	rows := sqlmock.NewRows(columns).
+		AddRow("SELECT", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0).
+		AddRow("DELETE", 10, 85, 41, 23, 15, 10, 0, 48, 10456, 20, 6548990, 1230, 7890, 56978940)
+	mock.ExpectQuery(sanitizeQuery(mysqlCommandCounterQuery)).WillReturnRows(rows)
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		if err = scrapeMysqlCommandCounters(db, ch); err != nil {
+			t.Errorf("error calling function on test %s", err)
+		}
+		close(ch)
+	}()
+
+	counterExpected := []metricResult{
+		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "100us"}, 0, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "500us"}, 0, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "1ms"}, 0, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "5ms"}, 0, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "10ms"}, 0, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "50ms"}, 0, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "100ms"}, 0, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "500ms"}, 0, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "1s"}, 0, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "5s"}, 0, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "10s"}, 0, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "INFs"}, 0, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "Total"}, 0, dto.MetricType_COUNTER},
+		{"proxysql_command_total_time", prometheus.Labels{"command": "SELECT"}, 0, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "100us"}, 41, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "500us"}, 23, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "1ms"}, 15, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "5ms"}, 10, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "10ms"}, 0, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "50ms"}, 48, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "100ms"}, 10456, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "500ms"}, 20, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "1s"}, 6548990, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "5s"}, 1230, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "10s"}, 7890, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "INFs"}, 56978940, dto.MetricType_COUNTER},
+		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "Total"}, 85, dto.MetricType_COUNTER},
+		{"proxysql_command_total_time", prometheus.Labels{"command": "DELETE"}, 10, dto.MetricType_COUNTER},
+	}
+
+	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
+		for _, expect := range counterExpected {
+			got := *readMetric(<-ch)
+			cv.So(got, convey.ShouldResemble, expect)
+		}
+	})
+
+	// Ensure all SQL queries were executed
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
 func TestScrapeMemoryMetrics(t *testing.T) {
 	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func(cv convey.C) {
 		for c, m := range memoryMetricsMetrics {
@@ -515,7 +587,7 @@ func TestExporter(t *testing.T) {
 	}
 
 	// wait up to 30 seconds for ProxySQL to become available
-	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true, true, true)
+	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true, true, true, true)
 	for i := 0; i < 30; i++ {
 		db, err := exporter.db()
 		if err != nil {

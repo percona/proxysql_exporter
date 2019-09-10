@@ -40,6 +40,7 @@ var (
 	mysqlConnectionPoolF         = flag.Bool("collect.mysql_connection_pool", true, "Collect from stats_mysql_connection_pool.")
 	mysqlConnectionListF         = flag.Bool("collect.mysql_connection_list", true, "Collect connection list from stats_mysql_processlist.")
 	mysqlDetailedConnectionListF = flag.Bool("collect.detailed.stats_mysql_processlist", false, "Collect detailed connection list from stats_mysql_processlist.")
+	mysqlCommandCountersF        = flag.Bool("collect.mysql_command_counters", false, "Collect statistics from stats_mysql_commands_counters.")
 	memoryMetricsF               = flag.Bool("collect.stats_memory_metrics", false, "Collect memory metrics from stats_memory_metrics.")
 )
 
@@ -66,7 +67,7 @@ func main() {
 
 	log.Infof("Starting %s %s for %s", program, version.Version, dsn)
 
-	exporter := NewExporter(dsn, *mysqlStatusF, *mysqlConnectionPoolF, *mysqlConnectionListF, *mysqlDetailedConnectionListF, *memoryMetricsF)
+	exporter := NewExporter(dsn, *mysqlStatusF, *mysqlConnectionPoolF, *mysqlConnectionListF, *mysqlDetailedConnectionListF, *mysqlCommandCountersF, *memoryMetricsF)
 	prometheus.MustRegister(exporter)
 
 	exporter_shared.RunServer("ProxySQL", *listenAddressF, *telemetryPathF, exporter_shared.DefaultMetricsHandler())

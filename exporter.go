@@ -34,6 +34,7 @@ type Exporter struct {
 	scrapeMySQLConnectionPool      bool
 	scrapeMySQLConnectionList      bool
 	scrapeDetailedMySQLProcessList bool
+	scrapeMysqlCommandCounters     bool
 	scrapeMemoryMetrics            bool
 	scrapesTotal                   prometheus.Counter
 	scrapeErrorsTotal              *prometheus.CounterVec
@@ -43,13 +44,14 @@ type Exporter struct {
 }
 
 // NewExporter returns a new ProxySQL exporter for the provided DSN.
-// It scrapes stats_mysql_global, stats_mysql_connection_pool and stats_mysql_processlist if corresponding parameters are true.
+// It scrapes stats_mysql_global, stats_mysql_connection_pool, stats_mysql_commands_counters and stats_mysql_processlist if corresponding parameters are true.
 func NewExporter(
 	dsn string,
 	scrapeMySQLGlobal bool,
 	scrapeMySQLConnectionPool bool,
 	scrapeMySQLConnectionList bool,
 	scrapeDetailedMySQLProcessList bool,
+	scrapeMysqlCommandCounters bool,
 	scrapeMemoryMetrics bool,
 ) *Exporter {
 	return &Exporter{
@@ -58,6 +60,7 @@ func NewExporter(
 		scrapeMySQLConnectionPool:      scrapeMySQLConnectionPool,
 		scrapeMySQLConnectionList:      scrapeMySQLConnectionList,
 		scrapeDetailedMySQLProcessList: scrapeDetailedMySQLProcessList,
+		scrapeMysqlCommandCounters:     scrapeMysqlCommandCounters,
 		scrapeMemoryMetrics:            scrapeMemoryMetrics,
 
 		scrapesTotal: prometheus.NewCounter(prometheus.CounterOpts{
@@ -187,6 +190,12 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 		if err = scrapeDetailedMySQLConnectionList(db, ch); err != nil {
 			log.Errorln("Error scraping for collect.stats_mysql_processlist", err)
 			e.scrapeErrorsTotal.WithLabelValues("collect.stats_mysql_processlist").Inc()
+		}
+	}
+	if e.scrapeMysqlCommandCounters {
+		if err = scrapeMysqlCommandCounters(db, ch); err != nil {
+			log.Errorln("Error scraping for collect.stats_mysql_commands_counters", err)
+			e.scrapeErrorsTotal.WithLabelValues("collect.stats_mysql_commands_counters").Inc()
 		}
 	}
 	if e.scrapeMemoryMetrics {
@@ -559,6 +568,119 @@ func scrapeMemoryMetrics(db *sql.DB, ch chan<- prometheus.Metric) error {
 		)
 	}
 
+	return rows.Err()
+}
+
+const mysqlCommandCounterQuery = "select Command, Total_Time_us, Total_cnt, cnt_100us, cnt_500us, cnt_1ms, cnt_5ms, cnt_10ms, cnt_50ms, cnt_100ms, cnt_500ms, cnt_1s, cnt_5s, cnt_10s, cnt_INFs from stats_mysql_commands_counters"
+
+type mysqlCommandCounterResult struct {
+	command    string
+	totalTime  int
+	totalCount int
+	count100us int
+	count500us int
+	count1ms   int
+	count5ms   int
+	count10ms  int
+	count50ms  int
+	count100ms int
+	count500ms int
+	count1s    int
+	count5s    int
+	count10s   int
+	countINFs  int
+}
+
+var mysqlCommandCountersMetrics = map[string]*metric{
+	"count": {
+		name:      "command",
+		valueType: prometheus.CounterValue,
+		help:      "Count of command queries executed in given time",
+	},
+	"total_time": {
+		name:      "command",
+		valueType: prometheus.CounterValue,
+		help:      "Total time spend in executing queries in microseconds",
+	},
+}
+
+var mysqlCommandLabels = [13]string{
+	"100us",
+	"500us",
+	"1ms",
+	"5ms",
+	"10ms",
+	"50ms",
+	"100ms",
+	"500ms",
+	"1s",
+	"5s",
+	"10s",
+	"INFs",
+	"Total",
+}
+
+func scrapeMysqlCommandCounters(db *sql.DB, ch chan<- prometheus.Metric) error {
+	rows, err := db.Query(mysqlCommandCounterQuery)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var res mysqlCommandCounterResult
+
+		scan := make([]int, 13)
+
+		err := rows.Scan(&res.command, &res.totalTime, &res.totalCount, &res.count100us, &res.count500us, &res.count1ms, &res.count5ms, &res.count10ms, &res.count50ms, &res.count100ms, &res.count500ms, &res.count1s, &res.count5s, &res.count10s, &res.countINFs)
+		if err != nil {
+			return err
+		}
+
+		scan[0] = res.count100us
+		scan[1] = res.count500us
+		scan[2] = res.count1ms
+		scan[3] = res.count5ms
+		scan[4] = res.count10ms
+		scan[5] = res.count50ms
+		scan[6] = res.count100ms
+		scan[7] = res.count500ms
+		scan[8] = res.count1s
+		scan[9] = res.count5s
+		scan[10] = res.count10s
+		scan[11] = res.countINFs
+		scan[12] = res.totalCount
+
+		for i, l := range mysqlCommandLabels {
+			m := mysqlCommandCountersMetrics["count"]
+
+			ch <- prometheus.MustNewConstMetric(
+				prometheus.NewDesc(
+					prometheus.BuildFQName(namespace, m.name, "count"),
+					m.help,
+					[]string{"command", "time_spent"},
+					nil,
+				),
+				m.valueType,
+				float64(scan[i]),
+				res.command, l,
+			)
+		}
+
+		m := mysqlCommandCountersMetrics["total_time"]
+
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc(
+				prometheus.BuildFQName(namespace, m.name, "total_time"),
+				m.help,
+				[]string{"command"},
+				nil,
+			),
+			m.valueType,
+			float64(res.totalTime),
+			res.command,
+		)
+	}
 	return rows.Err()
 }
 
