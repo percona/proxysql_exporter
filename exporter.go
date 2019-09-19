@@ -33,6 +33,7 @@ type Exporter struct {
 	scrapeMySQLGlobal              bool
 	scrapeMySQLConnectionPool      bool
 	scrapeMySQLConnectionList      bool
+	scrapeMySQLUserConnectionList  bool
 	scrapeDetailedMySQLProcessList bool
 	scrapeMemoryMetrics            bool
 	scrapesTotal                   prometheus.Counter
@@ -49,6 +50,7 @@ func NewExporter(
 	scrapeMySQLGlobal bool,
 	scrapeMySQLConnectionPool bool,
 	scrapeMySQLConnectionList bool,
+	scrapeMySQLUserConnectionList bool,
 	scrapeDetailedMySQLProcessList bool,
 	scrapeMemoryMetrics bool,
 ) *Exporter {
@@ -57,6 +59,7 @@ func NewExporter(
 		scrapeMySQLGlobal:              scrapeMySQLGlobal,
 		scrapeMySQLConnectionPool:      scrapeMySQLConnectionPool,
 		scrapeMySQLConnectionList:      scrapeMySQLConnectionList,
+		scrapeMySQLUserConnectionList:  scrapeMySQLUserConnectionList,
 		scrapeDetailedMySQLProcessList: scrapeDetailedMySQLProcessList,
 		scrapeMemoryMetrics:            scrapeMemoryMetrics,
 
@@ -181,6 +184,12 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 		if err = scrapeMySQLConnectionList(db, ch); err != nil {
 			log.Errorln("Error scraping for collect.mysql_connection_list:", err)
 			e.scrapeErrorsTotal.WithLabelValues("collect.mysql_connection_list").Inc()
+		}
+	}
+	if e.scrapeMySQLUserConnectionList {
+		if err = scrapeMySQLUserConnectionList(db, ch); err != nil {
+			log.Errorln("Error scraping for collect.stats_mysql_users:", err)
+			e.scrapeErrorsTotal.WithLabelValues("collect.stats_mysql_users").Inc()
 		}
 	}
 	if e.scrapeDetailedMySQLProcessList {
@@ -431,6 +440,51 @@ func scrapeMySQLConnectionList(db *sql.DB, ch chan<- prometheus.Metric) error {
 	return rows.Err()
 }
 
+const mysqlUserConnectionListQuery = "SELECT username, frontend_connections FROM stats_mysql_users"
+
+var mysqlUserConnectionListMetrics = map[string]*metric{
+	"frontend_connections_count": {"frontend_connections_count", prometheus.GaugeValue,
+		"Total number of frontend connections per user"},
+}
+
+type userConnectionListResult struct {
+	username            string
+	frontendConnections float64
+}
+
+func scrapeMySQLUserConnectionList(db *sql.DB, ch chan<- prometheus.Metric) error {
+	rows, err := db.Query(mysqlUserConnectionListQuery)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var res userConnectionListResult
+
+		err := rows.Scan(&res.username, &res.frontendConnections)
+		if err != nil {
+			return err
+		}
+
+		m := mysqlUserConnectionListMetrics["frontend_connections_count"]
+
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc(
+				prometheus.BuildFQName(namespace, "users", m.name),
+				m.help,
+				[]string{"username"},
+				nil,
+			),
+			m.valueType,
+			res.frontendConnections,
+			res.username,
+		)
+	}
+
+	return rows.Err()
+}
+
 const detailedMySQLProcessListQuery = "SELECT user, db, cli_host, hostgroup, COUNT(*) as count from stats_mysql_processlist group by user, db, cli_host, hostgroup"
 
 var detailedMySQLProcessListMetrics = map[string]*metric{
@@ -448,7 +502,6 @@ func scrapeDetailedMySQLConnectionList(db *sql.DB, ch chan<- prometheus.Metric) 
 		return err
 	}
 	defer rows.Close()
-
 
 	for rows.Next() {
 		var res processListResult
@@ -480,44 +533,44 @@ const memoryMetricsQuery = "select Variable_Name, Variable_Value  from stats_mem
 
 var memoryMetricsMetrics = map[string]*metric{
 	"jemalloc_allocated": {
-		name: "jemalloc_allocated",
+		name:      "jemalloc_allocated",
 		valueType: prometheus.GaugeValue,
-		help: "bytes allocated by the application",
+		help:      "bytes allocated by the application",
 	},
 	"jemalloc_active": {
-		name: "jemalloc_active",
+		name:      "jemalloc_active",
 		valueType: prometheus.GaugeValue,
-		help: "bytes in pages allocated by the application",
+		help:      "bytes in pages allocated by the application",
 	},
 	"jemalloc_mapped": {
-		name: "jemalloc_mapped",
+		name:      "jemalloc_mapped",
 		valueType: prometheus.GaugeValue,
-		help: "bytes in extents mapped by the allocator",
+		help:      "bytes in extents mapped by the allocator",
 	},
 	"jemalloc_metadata": {
-		name: "jemalloc_metadata",
+		name:      "jemalloc_metadata",
 		valueType: prometheus.GaugeValue,
-		help: "bytes dedicated to metadata",
+		help:      "bytes dedicated to metadata",
 	},
 	"jemalloc_resident": {
-		name: "jemalloc_resident",
+		name:      "jemalloc_resident",
 		valueType: prometheus.GaugeValue,
-		help: "bytes in physically resident data pages mapped by the allocator",
+		help:      "bytes in physically resident data pages mapped by the allocator",
 	},
 	"auth_memory": {
-		name: "auth_memory",
+		name:      "auth_memory",
 		valueType: prometheus.GaugeValue,
-		help: "memory used by the authentication module to store user credentials and attributes",
+		help:      "memory used by the authentication module to store user credentials and attributes",
 	},
 	"sqlite3_memory_bytes": {
-		name: "sqlite3_memory_bytes",
+		name:      "sqlite3_memory_bytes",
 		valueType: prometheus.GaugeValue,
-		help: "memory used by the embedded SQLite",
+		help:      "memory used by the embedded SQLite",
 	},
 	"query_digest_memory": {
-		name: "query_digest_memory",
+		name:      "query_digest_memory",
 		valueType: prometheus.GaugeValue,
-		help: "memory used to store data related to stats_mysql_query_digest",
+		help:      "memory used to store data related to stats_mysql_query_digest",
 	},
 }
 

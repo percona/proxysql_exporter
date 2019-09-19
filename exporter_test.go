@@ -16,11 +16,12 @@ package main
 
 import (
 	"errors"
-	"github.com/stretchr/testify/assert"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
@@ -294,6 +295,56 @@ func TestScrapeMySQLConnectionPoolError(t *testing.T) {
 	_ = *readMetric(<-ch2)
 }
 
+func TestScrapeMySQLUserConnectionList(t *testing.T) {
+	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func(cv convey.C) {
+		for c, m := range mysqlUserConnectionListMetrics {
+			cv.So(c, convey.ShouldEqual, strings.ToLower(c))
+			cv.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
+		}
+	})
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("error opening a stub database connection: %s", err)
+	}
+	defer db.Close()
+
+	columns := []string{"username", "frontend_connections"}
+	rows := sqlmock.NewRows(columns).
+		AddRow("user1", 1).
+		AddRow("user2", 2).
+		AddRow("user3", 3).
+		AddRow("user4", 4)
+	mock.ExpectQuery(sanitizeQuery(mysqlUserConnectionListQuery)).WillReturnRows(rows)
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		if err = scrapeMySQLUserConnectionList(db, ch); err != nil {
+			t.Errorf("error calling function on test: %s", err)
+		}
+		close(ch)
+	}()
+
+	counterExpected := []metricResult{
+		{"proxysql_users_frontend_connections_count", prometheus.Labels{"username": "user1"}, 1, dto.MetricType_GAUGE},
+		{"proxysql_users_frontend_connections_count", prometheus.Labels{"username": "user2"}, 2, dto.MetricType_GAUGE},
+		{"proxysql_users_frontend_connections_count", prometheus.Labels{"username": "user3"}, 3, dto.MetricType_GAUGE},
+		{"proxysql_users_frontend_connections_count", prometheus.Labels{"username": "user4"}, 4, dto.MetricType_GAUGE},
+	}
+
+	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
+		for _, expect := range counterExpected {
+			got := *readMetric(<-ch)
+			cv.So(got, convey.ShouldResemble, expect)
+		}
+	})
+
+	// Ensure all SQL queries were executed
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
 func TestScrapeMySQLConnectionList(t *testing.T) {
 	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func(cv convey.C) {
 		for c, m := range mySQLconnectionListMetrics {
@@ -515,7 +566,7 @@ func TestExporter(t *testing.T) {
 	}
 
 	// wait up to 30 seconds for ProxySQL to become available
-	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true, true, true)
+	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true, true, true, true)
 	for i := 0; i < 30; i++ {
 		db, err := exporter.db()
 		if err != nil {
