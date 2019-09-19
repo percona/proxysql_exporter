@@ -29,25 +29,36 @@ const namespace = "proxysql"
 // Exporter collects ProxySQL metrics.
 // It implements prometheus.Collector interface.
 type Exporter struct {
-	dsn                       string
-	scrapeMySQLGlobal         bool
-	scrapeMySQLConnectionPool bool
-	scrapeMySQLConnectionList bool
-	scrapesTotal              prometheus.Counter
-	scrapeErrorsTotal         *prometheus.CounterVec
-	lastScrapeError           prometheus.Gauge
-	lastScrapeDurationSeconds prometheus.Gauge
-	proxysqlUp                prometheus.Gauge
+	dsn                            string
+	scrapeMySQLGlobal              bool
+	scrapeMySQLConnectionPool      bool
+	scrapeMySQLConnectionList      bool
+	scrapeDetailedMySQLProcessList bool
+	scrapeMemoryMetrics            bool
+	scrapesTotal                   prometheus.Counter
+	scrapeErrorsTotal              *prometheus.CounterVec
+	lastScrapeError                prometheus.Gauge
+	lastScrapeDurationSeconds      prometheus.Gauge
+	proxysqlUp                     prometheus.Gauge
 }
 
 // NewExporter returns a new ProxySQL exporter for the provided DSN.
-// It scrapes stats_mysql_global and stats_mysql_connection_pool if corresponding parameters are true.
-func NewExporter(dsn string, scrapeMySQLGlobal bool, scrapeMySQLConnectionPool bool, scrapeMySQLConnectionList bool) *Exporter {
+// It scrapes stats_mysql_global, stats_mysql_connection_pool and stats_mysql_processlist if corresponding parameters are true.
+func NewExporter(
+	dsn string,
+	scrapeMySQLGlobal bool,
+	scrapeMySQLConnectionPool bool,
+	scrapeMySQLConnectionList bool,
+	scrapeDetailedMySQLProcessList bool,
+	scrapeMemoryMetrics bool,
+) *Exporter {
 	return &Exporter{
-		dsn:                       dsn,
-		scrapeMySQLGlobal:         scrapeMySQLGlobal,
-		scrapeMySQLConnectionPool: scrapeMySQLConnectionPool,
-		scrapeMySQLConnectionList: scrapeMySQLConnectionList,
+		dsn:                            dsn,
+		scrapeMySQLGlobal:              scrapeMySQLGlobal,
+		scrapeMySQLConnectionPool:      scrapeMySQLConnectionPool,
+		scrapeMySQLConnectionList:      scrapeMySQLConnectionList,
+		scrapeDetailedMySQLProcessList: scrapeDetailedMySQLProcessList,
+		scrapeMemoryMetrics:            scrapeMemoryMetrics,
 
 		scrapesTotal: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
@@ -170,6 +181,18 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 		if err = scrapeMySQLConnectionList(db, ch); err != nil {
 			log.Errorln("Error scraping for collect.mysql_connection_list:", err)
 			e.scrapeErrorsTotal.WithLabelValues("collect.mysql_connection_list").Inc()
+		}
+	}
+	if e.scrapeDetailedMySQLProcessList {
+		if err = scrapeDetailedMySQLConnectionList(db, ch); err != nil {
+			log.Errorln("Error scraping for collect.stats_mysql_processlist", err)
+			e.scrapeErrorsTotal.WithLabelValues("collect.stats_mysql_processlist").Inc()
+		}
+	}
+	if e.scrapeMemoryMetrics {
+		if err = scrapeMemoryMetrics(db, ch); err != nil {
+			log.Errorln("Error scraping for collect.stats_memory_metrics", err)
+			e.scrapeErrorsTotal.WithLabelValues("collect.stats_memory_metrics").Inc()
 		}
 	}
 }
@@ -405,6 +428,138 @@ func scrapeMySQLConnectionList(db *sql.DB, ch chan<- prometheus.Metric) error {
 			cliHost,
 		)
 	}
+	return rows.Err()
+}
+
+const detailedMySQLProcessListQuery = "SELECT user, db, cli_host, hostgroup, COUNT(*) as count from stats_mysql_processlist group by user, db, cli_host, hostgroup"
+
+var detailedMySQLProcessListMetrics = map[string]*metric{
+	"detailed_connection_count": {name: "detailed_client_connection_count", valueType: prometheus.GaugeValue, help: "Number of client connections per user, db, host and hostgroup."},
+}
+
+type processListResult struct {
+	user, db, clientHost, hostGroup string
+	count                           float64
+}
+
+func scrapeDetailedMySQLConnectionList(db *sql.DB, ch chan<- prometheus.Metric) error {
+	rows, err := db.Query(detailedMySQLProcessListQuery)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+
+	for rows.Next() {
+		var res processListResult
+
+		err := rows.Scan(&res.user, &res.db, &res.clientHost, &res.hostGroup, &res.count)
+		if err != nil {
+			return err
+		}
+
+		m := detailedMySQLProcessListMetrics["detailed_connection_count"]
+
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc(
+				prometheus.BuildFQName(namespace, "processlist", m.name),
+				m.help,
+				[]string{"user", "db", "client_host", "hostgroup"},
+				nil,
+			),
+			m.valueType,
+			res.count,
+			res.user, res.db, res.clientHost, res.hostGroup,
+		)
+	}
+
+	return rows.Err()
+}
+
+const memoryMetricsQuery = "select Variable_Name, Variable_Value  from stats_memory_metrics"
+
+var memoryMetricsMetrics = map[string]*metric{
+	"jemalloc_allocated": {
+		name: "jemalloc_allocated",
+		valueType: prometheus.GaugeValue,
+		help: "bytes allocated by the application",
+	},
+	"jemalloc_active": {
+		name: "jemalloc_active",
+		valueType: prometheus.GaugeValue,
+		help: "bytes in pages allocated by the application",
+	},
+	"jemalloc_mapped": {
+		name: "jemalloc_mapped",
+		valueType: prometheus.GaugeValue,
+		help: "bytes in extents mapped by the allocator",
+	},
+	"jemalloc_metadata": {
+		name: "jemalloc_metadata",
+		valueType: prometheus.GaugeValue,
+		help: "bytes dedicated to metadata",
+	},
+	"jemalloc_resident": {
+		name: "jemalloc_resident",
+		valueType: prometheus.GaugeValue,
+		help: "bytes in physically resident data pages mapped by the allocator",
+	},
+	"auth_memory": {
+		name: "auth_memory",
+		valueType: prometheus.GaugeValue,
+		help: "memory used by the authentication module to store user credentials and attributes",
+	},
+	"sqlite3_memory_bytes": {
+		name: "sqlite3_memory_bytes",
+		valueType: prometheus.GaugeValue,
+		help: "memory used by the embedded SQLite",
+	},
+	"query_digest_memory": {
+		name: "query_digest_memory",
+		valueType: prometheus.GaugeValue,
+		help: "memory used to store data related to stats_mysql_query_digest",
+	},
+}
+
+type memoryMetricsResult struct {
+	name  string
+	value float64
+}
+
+func scrapeMemoryMetrics(db *sql.DB, ch chan<- prometheus.Metric) error {
+	rows, err := db.Query(memoryMetricsQuery)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var res memoryMetricsResult
+
+		err := rows.Scan(&res.name, &res.value)
+		if err != nil {
+			return err
+		}
+
+		m := memoryMetricsMetrics[strings.ToLower(res.name)]
+		if m == nil {
+			m = &metric{
+				name:      res.name,
+				valueType: prometheus.UntypedValue,
+				help:      "Undocumented stats_memory_metrics metric.",
+			}
+		}
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc(
+				prometheus.BuildFQName(namespace, "stats_memory", m.name),
+				m.help,
+				nil, nil,
+			),
+			m.valueType,
+			res.value,
+		)
+	}
+
 	return rows.Err()
 }
 
