@@ -560,13 +560,59 @@ func TestScrapeDetailedConnectionLisError(t *testing.T) {
 	})
 }
 
+func TestScrapeMySQLMostFrequentQueries(t *testing.T) {
+	convey.Convey("Metrics are lowercase", t, convey.FailureContinues, func(cv convey.C) {
+		for c, m := range mysqlMostFrequentQueriesMetrics {
+			cv.So(c, convey.ShouldEqual, strings.ToLower(c))
+			cv.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
+		}
+	})
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("error opening a stub database connection: %s", err)
+	}
+	defer db.Close()
+
+	columns := []string{"hostgroup", "username", "digest", "query", "count"}
+	rows := sqlmock.NewRows(columns).
+		AddRow("0", "user0", "0x0000000000000000", "select foo from bar", 1).
+		AddRow("1", "user1", "0x0000000000000000", "select bar from foo", 1)
+	mock.ExpectQuery(sanitizeQuery(mysqlMostFrequentQueriesQuery)).WillReturnRows(rows)
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		if err = scrapeMySQLMostFrequentQueries(db, ch); err != nil {
+			t.Errorf("error calling function on test: %s", err)
+		}
+		close(ch)
+	}()
+
+	counterExpected := []metricResult{
+		{"proxysql_queries_most_frequent_count", prometheus.Labels{"hostgroup": "0", "username": "user0", "digest": "0x0000000000000000", "query": "select foo from bar"}, 1, dto.MetricType_GAUGE},
+		{"proxysql_queries_most_frequent_count", prometheus.Labels{"hostgroup": "1", "username": "user1", "digest": "0x0000000000000000", "query": "select bar from foo"}, 1, dto.MetricType_GAUGE},
+	}
+
+	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
+		for _, expect := range counterExpected {
+			got := *readMetric(<-ch)
+			cv.So(got, convey.ShouldResemble, expect)
+		}
+	})
+
+	// Ensure all SQL queries were executed
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
 func TestExporter(t *testing.T) {
 	if testing.Short() {
 		t.Skip("-short is passed, skipping integration test")
 	}
 
 	// wait up to 30 seconds for ProxySQL to become available
-	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true, true, true, true)
+	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true, true, true, true, true)
 	for i := 0; i < 30; i++ {
 		db, err := exporter.db()
 		if err != nil {

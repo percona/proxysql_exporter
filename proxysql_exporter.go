@@ -43,6 +43,7 @@ var (
 	mysqlUserConnectionListF     = flag.Bool("collect.stats_mysql_users", true, "Collect connection list from stats_mysql_users.")
 	mysqlDetailedConnectionListF = flag.Bool("collect.detailed.stats_mysql_processlist", false, "Collect detailed connection list from stats_mysql_processlist.")
 	memoryMetricsF               = flag.Bool("collect.stats_memory_metrics", false, "Collect memory metrics from stats_memory_metrics.")
+	mySQLMostFrequentQueriesF    = flag.Bool("collect.stats_mysql_query_digest", false, "Collect most frequent queries from stats_mysql_query_digest.")
 )
 
 func main() {
@@ -68,7 +69,7 @@ func main() {
 
 	log.Infof("Starting %s %s for %s", program, version.Version, dsn)
 
-	exporter := NewExporter(dsn, *mysqlStatusF, *mysqlConnectionPoolF, *mysqlConnectionListF, *mysqlUserConnectionListF, *mysqlDetailedConnectionListF, *memoryMetricsF)
+	exporter := NewExporter(dsn, *mysqlStatusF, *mysqlConnectionPoolF, *mysqlConnectionListF, *mysqlUserConnectionListF, *mysqlDetailedConnectionListF, *memoryMetricsF, *mySQLMostFrequentQueriesF)
 	prometheus.MustRegister(exporter)
 
 	exporter_shared.RunServer("ProxySQL", *listenAddressF, *telemetryPathF, promhttp.ContinueOnError)

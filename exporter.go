@@ -36,6 +36,7 @@ type Exporter struct {
 	scrapeMySQLUserConnectionList  bool
 	scrapeDetailedMySQLProcessList bool
 	scrapeMemoryMetrics            bool
+	scrapeMySQLMostFrequentQueries bool
 	scrapesTotal                   prometheus.Counter
 	scrapeErrorsTotal              *prometheus.CounterVec
 	lastScrapeError                prometheus.Gauge
@@ -53,6 +54,7 @@ func NewExporter(
 	scrapeMySQLUserConnectionList bool,
 	scrapeDetailedMySQLProcessList bool,
 	scrapeMemoryMetrics bool,
+	scrapeMySQLMostFrequentQueries bool,
 ) *Exporter {
 	return &Exporter{
 		dsn:                            dsn,
@@ -62,6 +64,7 @@ func NewExporter(
 		scrapeMySQLUserConnectionList:  scrapeMySQLUserConnectionList,
 		scrapeDetailedMySQLProcessList: scrapeDetailedMySQLProcessList,
 		scrapeMemoryMetrics:            scrapeMemoryMetrics,
+		scrapeMySQLMostFrequentQueries: scrapeMySQLMostFrequentQueries,
 
 		scrapesTotal: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
@@ -202,6 +205,12 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 		if err = scrapeMemoryMetrics(db, ch); err != nil {
 			log.Errorln("Error scraping for collect.stats_memory_metrics", err)
 			e.scrapeErrorsTotal.WithLabelValues("collect.stats_memory_metrics").Inc()
+		}
+	}
+	if e.scrapeMySQLMostFrequentQueries {
+		if err = scrapeMySQLMostFrequentQueries(db, ch); err != nil {
+			log.Errorln("Error scraping for collect.stats_mysql_query_digest", err)
+			e.scrapeErrorsTotal.WithLabelValues("collect.stats_mysql_query_digest").Inc()
 		}
 	}
 }
@@ -610,6 +619,55 @@ func scrapeMemoryMetrics(db *sql.DB, ch chan<- prometheus.Metric) error {
 			),
 			m.valueType,
 			res.value,
+		)
+	}
+
+	return rows.Err()
+}
+
+// Get most frequent queries
+const mysqlMostFrequentQueriesQuery = `SELECT hostgroup, username, digest, digest_text as query, count_star as count
+										FROM stats_mysql_query_digest
+										ORDER BY count desc
+										LIMIT 25`
+
+var mysqlMostFrequentQueriesMetrics = map[string]*metric{
+	"most_frequent_count": {"most_frequent_count", prometheus.GaugeValue,
+		"Most frequent queries"},
+}
+
+type mostFrequentQueriesResult struct {
+	hostgroup, username, digest, query string
+	count                              float64
+}
+
+func scrapeMySQLMostFrequentQueries(db *sql.DB, ch chan<- prometheus.Metric) error {
+	rows, err := db.Query(mysqlMostFrequentQueriesQuery)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var res mostFrequentQueriesResult
+
+		err := rows.Scan(&res.hostgroup, &res.username, &res.digest, &res.query, &res.count)
+		if err != nil {
+			return err
+		}
+
+		m := mysqlMostFrequentQueriesMetrics["most_frequent_count"]
+
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc(
+				prometheus.BuildFQName(namespace, "queries", m.name),
+				m.help,
+				[]string{"hostgroup", "username", "digest", "query"},
+				nil,
+			),
+			m.valueType,
+			res.count,
+			res.hostgroup, res.username, res.digest, res.query,
 		)
 	}
 
