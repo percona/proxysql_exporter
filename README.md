@@ -43,6 +43,8 @@ Name                                       | Description
 `collect.mysql_connection_pool`            | Collect from stats_mysql_connection_pool. (default true)
 `collect.mysql_status`                     | Collect from stats_mysql_global (SHOW MYSQL STATUS). (default true)
 `collect.stats_memory_metrics`             | Collect memory metrics from stats_memory_metrics.
+`collect.stats_most_frequent_queries`      | Collect most frequent queries metrics from stats_mysql_query_digest.
+`collect.stats_longest_running_queries`    | Collect longest running queries metrics from stats_mysql_query_digest.
 
 
 ### General Flags

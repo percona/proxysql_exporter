@@ -29,19 +29,20 @@ const namespace = "proxysql"
 // Exporter collects ProxySQL metrics.
 // It implements prometheus.Collector interface.
 type Exporter struct {
-	dsn                            string
-	scrapeMySQLGlobal              bool
-	scrapeMySQLConnectionPool      bool
-	scrapeMySQLConnectionList      bool
-	scrapeMySQLUserConnectionList  bool
-	scrapeDetailedMySQLProcessList bool
-	scrapeMemoryMetrics            bool
-	scrapeMySQLMostFrequentQueries bool
-	scrapesTotal                   prometheus.Counter
-	scrapeErrorsTotal              *prometheus.CounterVec
-	lastScrapeError                prometheus.Gauge
-	lastScrapeDurationSeconds      prometheus.Gauge
-	proxysqlUp                     prometheus.Gauge
+	dsn                              string
+	scrapeMySQLGlobal                bool
+	scrapeMySQLConnectionPool        bool
+	scrapeMySQLConnectionList        bool
+	scrapeMySQLUserConnectionList    bool
+	scrapeDetailedMySQLProcessList   bool
+	scrapeMemoryMetrics              bool
+	scrapeMySQLMostFrequentQueries   bool
+	scrapeMySQLLongestRunningQueries bool
+	scrapesTotal                     prometheus.Counter
+	scrapeErrorsTotal                *prometheus.CounterVec
+	lastScrapeError                  prometheus.Gauge
+	lastScrapeDurationSeconds        prometheus.Gauge
+	proxysqlUp                       prometheus.Gauge
 }
 
 // NewExporter returns a new ProxySQL exporter for the provided DSN.
@@ -55,16 +56,18 @@ func NewExporter(
 	scrapeDetailedMySQLProcessList bool,
 	scrapeMemoryMetrics bool,
 	scrapeMySQLMostFrequentQueries bool,
+	scrapeMySQLLongestRunningQueries bool,
 ) *Exporter {
 	return &Exporter{
-		dsn:                            dsn,
-		scrapeMySQLGlobal:              scrapeMySQLGlobal,
-		scrapeMySQLConnectionPool:      scrapeMySQLConnectionPool,
-		scrapeMySQLConnectionList:      scrapeMySQLConnectionList,
-		scrapeMySQLUserConnectionList:  scrapeMySQLUserConnectionList,
-		scrapeDetailedMySQLProcessList: scrapeDetailedMySQLProcessList,
-		scrapeMemoryMetrics:            scrapeMemoryMetrics,
-		scrapeMySQLMostFrequentQueries: scrapeMySQLMostFrequentQueries,
+		dsn:                              dsn,
+		scrapeMySQLGlobal:                scrapeMySQLGlobal,
+		scrapeMySQLConnectionPool:        scrapeMySQLConnectionPool,
+		scrapeMySQLConnectionList:        scrapeMySQLConnectionList,
+		scrapeMySQLUserConnectionList:    scrapeMySQLUserConnectionList,
+		scrapeDetailedMySQLProcessList:   scrapeDetailedMySQLProcessList,
+		scrapeMemoryMetrics:              scrapeMemoryMetrics,
+		scrapeMySQLMostFrequentQueries:   scrapeMySQLMostFrequentQueries,
+		scrapeMySQLLongestRunningQueries: scrapeMySQLLongestRunningQueries,
 
 		scrapesTotal: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
@@ -209,8 +212,14 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 	}
 	if e.scrapeMySQLMostFrequentQueries {
 		if err = scrapeMySQLMostFrequentQueries(db, ch); err != nil {
-			log.Errorln("Error scraping for collect.stats_mysql_query_digest", err)
-			e.scrapeErrorsTotal.WithLabelValues("collect.stats_mysql_query_digest").Inc()
+			log.Errorln("Error scraping for collect.stats_most_frequent_queries", err)
+			e.scrapeErrorsTotal.WithLabelValues("collect.stats_most_frequent_queries").Inc()
+		}
+	}
+	if e.scrapeMySQLLongestRunningQueries {
+		if err = scrapeMySQLLongestRunningQueries(db, ch); err != nil {
+			log.Errorln("Error scraping for collect.stats_longest_running_queries", err)
+			e.scrapeErrorsTotal.WithLabelValues("collect.stats_longest_running_queries").Inc()
 		}
 	}
 }
@@ -667,6 +676,55 @@ func scrapeMySQLMostFrequentQueries(db *sql.DB, ch chan<- prometheus.Metric) err
 			),
 			m.valueType,
 			res.count,
+			res.hostgroup, res.username, res.digest, res.query,
+		)
+	}
+
+	return rows.Err()
+}
+
+// Get longest running queries
+const mysqlLongestRunningQueriesQuery = `SELECT hostgroup, username, digest, digest_text as query, sum_time as total_time
+										FROM stats_mysql_query_digest
+										ORDER BY total_time desc
+										LIMIT 25`
+
+var mysqlLongestRunningQueriesMetrics = map[string]*metric{
+	"longest_running_total": {"longest_running_total", prometheus.CounterValue,
+		"Most frequent queries"},
+}
+
+type longestRunningQueriesResult struct {
+	hostgroup, username, digest, query string
+	totalTime                          float64
+}
+
+func scrapeMySQLLongestRunningQueries(db *sql.DB, ch chan<- prometheus.Metric) error {
+	rows, err := db.Query(mysqlLongestRunningQueriesQuery)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var res longestRunningQueriesResult
+
+		err := rows.Scan(&res.hostgroup, &res.username, &res.digest, &res.query, &res.totalTime)
+		if err != nil {
+			return err
+		}
+
+		m := mysqlLongestRunningQueriesMetrics["longest_running_total"]
+
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc(
+				prometheus.BuildFQName(namespace, "queries", m.name),
+				m.help,
+				[]string{"hostgroup", "username", "digest", "query"},
+				nil,
+			),
+			m.valueType,
+			res.totalTime,
 			res.hostgroup, res.username, res.digest, res.query,
 		)
 	}
