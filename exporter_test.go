@@ -16,59 +16,16 @@ package main
 
 import (
 	"errors"
-	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/percona/exporter_shared/helpers"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/DATA-DOG/go-sqlmock.v1"
 )
-
-var nameRE = regexp.MustCompile(`fqName: "(\w+)"`)
-
-// https://github.com/prometheus/client_golang/issues/322
-func getName(d *prometheus.Desc) string {
-	m := nameRE.FindStringSubmatch(d.String())
-	if len(m) != 2 {
-		panic("failed to get metric name from " + d.String())
-	}
-	return m[1]
-}
-
-type metricResult struct {
-	name       string
-	labels     prometheus.Labels
-	value      float64
-	metricType dto.MetricType
-}
-
-// https://github.com/prometheus/client_golang/issues/323
-func readMetric(m prometheus.Metric) *metricResult {
-	pb := &dto.Metric{}
-	err := m.Write(pb)
-	if err != nil {
-		panic(err)
-	}
-
-	name := getName(m.Desc())
-	labels := make(prometheus.Labels, len(pb.Label))
-	for _, v := range pb.Label {
-		labels[v.GetName()] = v.GetValue()
-	}
-	if pb.Gauge != nil {
-		return &metricResult{name, labels, pb.GetGauge().GetValue(), dto.MetricType_GAUGE}
-	}
-	if pb.Counter != nil {
-		return &metricResult{name, labels, pb.GetCounter().GetValue(), dto.MetricType_COUNTER}
-	}
-	if pb.Untyped != nil {
-		return &metricResult{name, labels, pb.GetUntyped().GetValue(), dto.MetricType_UNTYPED}
-	}
-	panic("Unsupported metric type")
-}
 
 func sanitizeQuery(q string) string {
 	q = strings.Join(strings.Fields(q), " ")
@@ -110,17 +67,34 @@ func TestScrapeMySQLGlobal(t *testing.T) {
 		close(ch)
 	}()
 
-	counterExpected := []metricResult{
-		{"proxysql_mysql_status_active_transactions", prometheus.Labels{}, 3, dto.MetricType_GAUGE},
-		{"proxysql_mysql_status_backend_query_time_nsec", prometheus.Labels{}, 76355784684851, dto.MetricType_UNTYPED},
-		{"proxysql_mysql_status_client_connections_aborted", prometheus.Labels{}, 0, dto.MetricType_COUNTER},
-		{"proxysql_mysql_status_client_connections_connected", prometheus.Labels{}, 64, dto.MetricType_GAUGE},
-		{"proxysql_mysql_status_client_connections_created", prometheus.Labels{}, 1087931, dto.MetricType_COUNTER},
-		{"proxysql_mysql_status_servers_table_version", prometheus.Labels{}, 2019470, dto.MetricType_UNTYPED},
-	}
+	counterExpected := []helpers.Metric{{
+		"proxysql_mysql_status_active_transactions",
+		"Current number of active transactions.",
+		prometheus.Labels{}, dto.MetricType_GAUGE, 3,
+	}, {
+		"proxysql_mysql_status_backend_query_time_nsec",
+		"Undocumented stats_mysql_global metric.",
+		prometheus.Labels{}, dto.MetricType_UNTYPED, 76355784684851,
+	}, {
+		"proxysql_mysql_status_client_connections_aborted",
+		"Total number of frontend connections aborted due to invalid credential or max_connections reached.",
+		prometheus.Labels{}, dto.MetricType_COUNTER, 0,
+	}, {
+		"proxysql_mysql_status_client_connections_connected",
+		"Current number of frontend connections.",
+		prometheus.Labels{}, dto.MetricType_GAUGE, 64,
+	}, {
+		"proxysql_mysql_status_client_connections_created",
+		"Total number of frontend connections created so far.",
+		prometheus.Labels{}, dto.MetricType_COUNTER, 1087931,
+	}, {
+		"proxysql_mysql_status_servers_table_version",
+		"Undocumented stats_mysql_global metric.",
+		prometheus.Labels{}, dto.MetricType_UNTYPED, 2019470,
+	}}
 	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
 		for _, expect := range counterExpected {
-			got := *readMetric(<-ch)
+			got := *helpers.ReadMetric(<-ch)
 			cv.So(got, convey.ShouldResemble, expect)
 		}
 	})
@@ -162,7 +136,7 @@ func TestScrapeMySQLGlobalError(t *testing.T) {
 		close(ch2)
 	}()
 
-	_ = *readMetric(<-ch2)
+	_ = *helpers.ReadMetric(<-ch2)
 }
 
 func TestScrapeMySQLConnectionPool(t *testing.T) {
@@ -196,50 +170,51 @@ func TestScrapeMySQLConnectionPool(t *testing.T) {
 		close(ch)
 	}()
 
-	counterExpected := []metricResult{
-		{"proxysql_connection_pool_status", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, 1, dto.MetricType_GAUGE},
-		{"proxysql_connection_pool_conn_used", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, 0, dto.MetricType_GAUGE},
-		{"proxysql_connection_pool_conn_free", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, 45, dto.MetricType_GAUGE},
-		{"proxysql_connection_pool_conn_ok", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, 1895677, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_conn_err", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, 46, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_queries", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, 197941647, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_bytes_data_sent", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, 10984550806, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_bytes_data_recv", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, 321063484988, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_latency_us", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, 163, dto.MetricType_GAUGE},
+	counterExpected := []helpers.Metric{
+		{"proxysql_connection_pool_status", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, dto.MetricType_GAUGE, 1},
+		{"proxysql_connection_pool_conn_used", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, dto.MetricType_GAUGE, 0},
+		{"proxysql_connection_pool_conn_free", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, dto.MetricType_GAUGE, 45},
+		{"proxysql_connection_pool_conn_ok", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, dto.MetricType_COUNTER, 1895677},
+		{"proxysql_connection_pool_conn_err", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, dto.MetricType_COUNTER, 46},
+		{"proxysql_connection_pool_queries", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, dto.MetricType_COUNTER, 197941647},
+		{"proxysql_connection_pool_bytes_data_sent", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, dto.MetricType_COUNTER, 10984550806},
+		{"proxysql_connection_pool_bytes_data_recv", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, dto.MetricType_COUNTER, 321063484988},
+		{"proxysql_connection_pool_latency_us", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.80:3306"}, dto.MetricType_GAUGE, 163},
 
-		{"proxysql_connection_pool_status", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, 2, dto.MetricType_GAUGE},
-		{"proxysql_connection_pool_conn_used", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, 0, dto.MetricType_GAUGE},
-		{"proxysql_connection_pool_conn_free", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, 97, dto.MetricType_GAUGE},
-		{"proxysql_connection_pool_conn_ok", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, 39859, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_conn_err", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, 0, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_queries", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, 386686994, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_bytes_data_sent", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, 21643682247, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_bytes_data_recv", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, 641406745151, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_latency_us", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, 255, dto.MetricType_GAUGE},
+		{"proxysql_connection_pool_status", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, dto.MetricType_GAUGE, 2},
+		{"proxysql_connection_pool_conn_used", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, dto.MetricType_GAUGE, 0},
+		{"proxysql_connection_pool_conn_free", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, dto.MetricType_GAUGE, 97},
+		{"proxysql_connection_pool_conn_ok", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, dto.MetricType_COUNTER, 39859},
+		{"proxysql_connection_pool_conn_err", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, dto.MetricType_COUNTER, 0},
+		{"proxysql_connection_pool_queries", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, dto.MetricType_COUNTER, 386686994},
+		{"proxysql_connection_pool_bytes_data_sent", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, dto.MetricType_COUNTER, 21643682247},
+		{"proxysql_connection_pool_bytes_data_recv", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, dto.MetricType_COUNTER, 641406745151},
+		{"proxysql_connection_pool_latency_us", "", prometheus.Labels{"hostgroup": "0", "endpoint": "10.91.142.82:3306"}, dto.MetricType_GAUGE, 255},
 
-		{"proxysql_connection_pool_status", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, 3, dto.MetricType_GAUGE},
-		{"proxysql_connection_pool_conn_used", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, 0, dto.MetricType_GAUGE},
-		{"proxysql_connection_pool_conn_free", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, 18, dto.MetricType_GAUGE},
-		{"proxysql_connection_pool_conn_ok", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, 31471, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_conn_err", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, 6391, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_queries", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, 255993467, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_bytes_data_sent", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, 14327840185, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_bytes_data_recv", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, 420795691329, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_latency_us", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, 283, dto.MetricType_GAUGE},
+		{"proxysql_connection_pool_status", "", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, dto.MetricType_GAUGE, 3},
+		{"proxysql_connection_pool_conn_used", "", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, dto.MetricType_GAUGE, 0},
+		{"proxysql_connection_pool_conn_free", "", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, dto.MetricType_GAUGE, 18},
+		{"proxysql_connection_pool_conn_ok", "", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, dto.MetricType_COUNTER, 31471},
+		{"proxysql_connection_pool_conn_err", "", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, dto.MetricType_COUNTER, 6391},
+		{"proxysql_connection_pool_queries", "", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, dto.MetricType_COUNTER, 255993467},
+		{"proxysql_connection_pool_bytes_data_sent", "", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, dto.MetricType_COUNTER, 14327840185},
+		{"proxysql_connection_pool_bytes_data_recv", "", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, dto.MetricType_COUNTER, 420795691329},
+		{"proxysql_connection_pool_latency_us", "", prometheus.Labels{"hostgroup": "1", "endpoint": "10.91.142.88:3306"}, dto.MetricType_GAUGE, 283},
 
-		{"proxysql_connection_pool_status", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, 4, dto.MetricType_GAUGE},
-		{"proxysql_connection_pool_conn_used", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, 0, dto.MetricType_GAUGE},
-		{"proxysql_connection_pool_conn_free", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, 18, dto.MetricType_GAUGE},
-		{"proxysql_connection_pool_conn_ok", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, 31471, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_conn_err", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, 6391, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_queries", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, 255993467, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_bytes_data_sent", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, 14327840185, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_bytes_data_recv", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, 420795691329, dto.MetricType_COUNTER},
-		{"proxysql_connection_pool_latency_us", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, 283, dto.MetricType_GAUGE},
+		{"proxysql_connection_pool_status", "", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, dto.MetricType_GAUGE, 4},
+		{"proxysql_connection_pool_conn_used", "", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, dto.MetricType_GAUGE, 0},
+		{"proxysql_connection_pool_conn_free", "", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, dto.MetricType_GAUGE, 18},
+		{"proxysql_connection_pool_conn_ok", "", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, dto.MetricType_COUNTER, 31471},
+		{"proxysql_connection_pool_conn_err", "", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, dto.MetricType_COUNTER, 6391},
+		{"proxysql_connection_pool_queries", "", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, dto.MetricType_COUNTER, 255993467},
+		{"proxysql_connection_pool_bytes_data_sent", "", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, dto.MetricType_COUNTER, 14327840185},
+		{"proxysql_connection_pool_bytes_data_recv", "", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, dto.MetricType_COUNTER, 420795691329},
+		{"proxysql_connection_pool_latency_us", "", prometheus.Labels{"hostgroup": "2", "endpoint": "10.91.142.89:3306"}, dto.MetricType_GAUGE, 283},
 	}
 	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
 		for _, expect := range counterExpected {
-			got := *readMetric(<-ch)
+			got := *helpers.ReadMetric(<-ch)
+			got.Help = ""
 			cv.So(got, convey.ShouldResemble, expect)
 		}
 	})
@@ -290,7 +265,7 @@ func TestScrapeMySQLConnectionPoolError(t *testing.T) {
 		close(ch2)
 	}()
 
-	_ = *readMetric(<-ch2)
+	_ = *helpers.ReadMetric(<-ch2)
 }
 
 func TestScrapeMySQLConnectionList(t *testing.T) {
@@ -323,16 +298,17 @@ func TestScrapeMySQLConnectionList(t *testing.T) {
 		close(ch)
 	}()
 
-	counterExpected := []metricResult{
-		{"proxysql_processlist_client_connection_list", prometheus.Labels{"client_host": "10.91.142.80"}, 10, dto.MetricType_GAUGE},
-		{"proxysql_processlist_client_connection_list", prometheus.Labels{"client_host": "10.91.142.82"}, 15, dto.MetricType_GAUGE},
-		{"proxysql_processlist_client_connection_list", prometheus.Labels{"client_host": "10.91.142.88"}, 20, dto.MetricType_GAUGE},
-		{"proxysql_processlist_client_connection_list", prometheus.Labels{"client_host": "10.91.142.89"}, 25, dto.MetricType_GAUGE},
+	counterExpected := []helpers.Metric{
+		{"proxysql_processlist_client_connection_list", "", prometheus.Labels{"client_host": "10.91.142.80"}, dto.MetricType_GAUGE, 10},
+		{"proxysql_processlist_client_connection_list", "", prometheus.Labels{"client_host": "10.91.142.82"}, dto.MetricType_GAUGE, 15},
+		{"proxysql_processlist_client_connection_list", "", prometheus.Labels{"client_host": "10.91.142.88"}, dto.MetricType_GAUGE, 20},
+		{"proxysql_processlist_client_connection_list", "", prometheus.Labels{"client_host": "10.91.142.89"}, dto.MetricType_GAUGE, 25},
 	}
 
 	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
 		for _, expect := range counterExpected {
-			got := *readMetric(<-ch)
+			got := *helpers.ReadMetric(<-ch)
+			got.Help = ""
 			cv.So(got, convey.ShouldResemble, expect)
 		}
 	})
@@ -378,7 +354,7 @@ func TestScrapeMySQLConnectionListError(t *testing.T) {
 		close(ch2)
 	}()
 
-	_ = *readMetric(<-ch2)
+	_ = *helpers.ReadMetric(<-ch2)
 }
 
 func TestScrapeDetailedConnectionList(t *testing.T) {
@@ -411,16 +387,31 @@ func TestScrapeDetailedConnectionList(t *testing.T) {
 		close(ch)
 	}()
 
-	counterExpected := []metricResult{
-		{"proxysql_processlist_detailed_client_connection_count", prometheus.Labels{"client_host": "10.91.142.80", "user": "user_1", "db": "database_1", "hostgroup": "1001"}, 1, dto.MetricType_GAUGE},
-		{"proxysql_processlist_detailed_client_connection_count", prometheus.Labels{"client_host": "10.91.142.82", "user": "user_2", "db": "database_2", "hostgroup": "1002"}, 2, dto.MetricType_GAUGE},
-		{"proxysql_processlist_detailed_client_connection_count", prometheus.Labels{"client_host": "10.91.142.88", "user": "user_3", "db": "database_3", "hostgroup": "1003"}, 3, dto.MetricType_GAUGE},
-		{"proxysql_processlist_detailed_client_connection_count", prometheus.Labels{"client_host": "10.91.142.89", "user": "user_4", "db": "database_4", "hostgroup": "1004"}, 4, dto.MetricType_GAUGE},
-	}
+	counterExpected := []helpers.Metric{{
+		"proxysql_processlist_detailed_client_connection_count",
+		"Number of client connections per user, db, host and hostgroup.",
+		prometheus.Labels{"client_host": "10.91.142.80", "user": "user_1", "db": "database_1", "hostgroup": "1001"},
+		dto.MetricType_GAUGE, 1,
+	}, {
+		"proxysql_processlist_detailed_client_connection_count",
+		"Number of client connections per user, db, host and hostgroup.",
+		prometheus.Labels{"client_host": "10.91.142.82", "user": "user_2", "db": "database_2", "hostgroup": "1002"},
+		dto.MetricType_GAUGE, 2,
+	}, {
+		"proxysql_processlist_detailed_client_connection_count",
+		"Number of client connections per user, db, host and hostgroup.",
+		prometheus.Labels{"client_host": "10.91.142.88", "user": "user_3", "db": "database_3", "hostgroup": "1003"},
+		dto.MetricType_GAUGE, 3,
+	}, {
+		"proxysql_processlist_detailed_client_connection_count",
+		"Number of client connections per user, db, host and hostgroup.",
+		prometheus.Labels{"client_host": "10.91.142.89", "user": "user_4", "db": "database_4", "hostgroup": "1004"},
+		dto.MetricType_GAUGE, 4,
+	}}
 
 	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
 		for _, expect := range counterExpected {
-			got := *readMetric(<-ch)
+			got := *helpers.ReadMetric(<-ch)
 			cv.So(got, convey.ShouldResemble, expect)
 		}
 	})
@@ -459,40 +450,41 @@ func TestScrapeCommands(t *testing.T) {
 		close(ch)
 	}()
 
-	counterExpected := []metricResult{
-		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "100us"}, 0, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "500us"}, 0, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "1ms"}, 0, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "5ms"}, 0, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "10ms"}, 0, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "50ms"}, 0, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "100ms"}, 0, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "500ms"}, 0, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "1s"}, 0, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "5s"}, 0, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "10s"}, 0, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "INFs"}, 0, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "SELECT", "time_spent": "Total"}, 0, dto.MetricType_COUNTER},
-		{"proxysql_command_total_time", prometheus.Labels{"command": "SELECT"}, 0, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "100us"}, 41, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "500us"}, 23, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "1ms"}, 15, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "5ms"}, 10, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "10ms"}, 0, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "50ms"}, 48, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "100ms"}, 10456, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "500ms"}, 20, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "1s"}, 6548990, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "5s"}, 1230, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "10s"}, 7890, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "INFs"}, 56978940, dto.MetricType_COUNTER},
-		{"proxysql_command_count", prometheus.Labels{"command": "DELETE", "time_spent": "Total"}, 85, dto.MetricType_COUNTER},
-		{"proxysql_command_total_time", prometheus.Labels{"command": "DELETE"}, 10, dto.MetricType_COUNTER},
+	counterExpected := []helpers.Metric{
+		{"proxysql_command_count", "", prometheus.Labels{"command": "SELECT", "time_spent": "100us"}, dto.MetricType_COUNTER, 0},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "SELECT", "time_spent": "500us"}, dto.MetricType_COUNTER, 0},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "SELECT", "time_spent": "1ms"}, dto.MetricType_COUNTER, 0},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "SELECT", "time_spent": "5ms"}, dto.MetricType_COUNTER, 0},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "SELECT", "time_spent": "10ms"}, dto.MetricType_COUNTER, 0},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "SELECT", "time_spent": "50ms"}, dto.MetricType_COUNTER, 0},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "SELECT", "time_spent": "100ms"}, dto.MetricType_COUNTER, 0},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "SELECT", "time_spent": "500ms"}, dto.MetricType_COUNTER, 0},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "SELECT", "time_spent": "1s"}, dto.MetricType_COUNTER, 0},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "SELECT", "time_spent": "5s"}, dto.MetricType_COUNTER, 0},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "SELECT", "time_spent": "10s"}, dto.MetricType_COUNTER, 0},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "SELECT", "time_spent": "INFs"}, dto.MetricType_COUNTER, 0},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "SELECT", "time_spent": "Total"}, dto.MetricType_COUNTER, 0},
+		{"proxysql_command_total_time", "", prometheus.Labels{"command": "SELECT"}, dto.MetricType_COUNTER, 0},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "DELETE", "time_spent": "100us"}, dto.MetricType_COUNTER, 41},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "DELETE", "time_spent": "500us"}, dto.MetricType_COUNTER, 23},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "DELETE", "time_spent": "1ms"}, dto.MetricType_COUNTER, 15},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "DELETE", "time_spent": "5ms"}, dto.MetricType_COUNTER, 10},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "DELETE", "time_spent": "10ms"}, dto.MetricType_COUNTER, 0},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "DELETE", "time_spent": "50ms"}, dto.MetricType_COUNTER, 48},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "DELETE", "time_spent": "100ms"}, dto.MetricType_COUNTER, 10456},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "DELETE", "time_spent": "500ms"}, dto.MetricType_COUNTER, 20},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "DELETE", "time_spent": "1s"}, dto.MetricType_COUNTER, 6548990},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "DELETE", "time_spent": "5s"}, dto.MetricType_COUNTER, 1230},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "DELETE", "time_spent": "10s"}, dto.MetricType_COUNTER, 7890},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "DELETE", "time_spent": "INFs"}, dto.MetricType_COUNTER, 56978940},
+		{"proxysql_command_count", "", prometheus.Labels{"command": "DELETE", "time_spent": "Total"}, dto.MetricType_COUNTER, 85},
+		{"proxysql_command_total_time", "", prometheus.Labels{"command": "DELETE"}, dto.MetricType_COUNTER, 10},
 	}
 
 	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
 		for _, expect := range counterExpected {
-			got := *readMetric(<-ch)
+			got := *helpers.ReadMetric(<-ch)
+			got.Help = ""
 			cv.So(got, convey.ShouldResemble, expect)
 		}
 	})
@@ -531,14 +523,14 @@ func TestScrapeMemoryMetrics(t *testing.T) {
 		close(ch)
 	}()
 
-	counterExpected := []metricResult{
-		{"proxysql_stats_memory_stack_memory_admin_threads", prometheus.Labels{}, 32541, dto.MetricType_UNTYPED},
-		{"proxysql_stats_memory_query_digest_memory", prometheus.Labels{}, 7314, dto.MetricType_GAUGE},
+	counterExpected := []helpers.Metric{
+		{"proxysql_stats_memory_stack_memory_admin_threads", "Undocumented stats_memory_metrics metric.", prometheus.Labels{}, dto.MetricType_UNTYPED, 32541},
+		{"proxysql_stats_memory_query_digest_memory", "memory used to store data related to stats_mysql_query_digest", prometheus.Labels{}, dto.MetricType_GAUGE, 7314},
 	}
 
 	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
 		for _, expect := range counterExpected {
-			got := *readMetric(<-ch)
+			got := *helpers.ReadMetric(<-ch)
 			cv.So(got, convey.ShouldResemble, expect)
 		}
 	})
@@ -613,23 +605,23 @@ func TestExporter(t *testing.T) {
 			close(ch)
 		}()
 
-		var metrics []metricResult
+		var metrics []helpers.Metric
 		for m := range ch {
-			got := *readMetric(m)
-			got.value = 0 // ignore actual values in comparison for now
+			got := *helpers.ReadMetric(m)
+			got.Value = 0 // ignore actual values in comparison for now
 			metrics = append(metrics, got)
 		}
 
 		for _, m := range metrics {
-			cv.So(m.name, convey.ShouldEqual, strings.ToLower(m.name))
-			for k := range m.labels {
+			cv.So(m.Name, convey.ShouldEqual, strings.ToLower(m.Name))
+			for k := range m.Labels {
 				cv.So(k, convey.ShouldEqual, strings.ToLower(k))
 			}
 		}
 
-		cv.So(metricResult{"proxysql_connection_pool_latency_us", prometheus.Labels{"hostgroup": "1", "endpoint": "mysql:3306"}, 0, dto.MetricType_GAUGE},
+		cv.So(helpers.Metric{"proxysql_connection_pool_latency_us", "", prometheus.Labels{"hostgroup": "1", "endpoint": "mysql:3306"}, dto.MetricType_GAUGE, 0},
 			convey.ShouldBeIn, metrics)
-		cv.So(metricResult{"proxysql_connection_pool_latency_us", prometheus.Labels{"hostgroup": "1", "endpoint": "percona-server:3306"}, 0, dto.MetricType_GAUGE},
+		cv.So(helpers.Metric{"proxysql_connection_pool_latency_us", "", prometheus.Labels{"hostgroup": "1", "endpoint": "percona-server:3306"}, dto.MetricType_GAUGE, 0},
 			convey.ShouldBeIn, metrics)
 	})
 }

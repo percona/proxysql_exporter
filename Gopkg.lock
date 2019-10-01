@@ -85,9 +85,12 @@
   version = "v1.0.1"
 
 [[projects]]
-  digest = "1:af6e8256d0883d4e0f184cac946a13f901c219569246555eadf824655a709284"
+  digest = "1:2e1790fe0d97c770398058c454ef4283703c0c77d88ddb127884a4e4fa058ac8"
   name = "github.com/percona/exporter_shared"
-  packages = ["."]
+  packages = [
+    ".",
+    "helpers",
+  ]
   pruneopts = "NUT"
   revision = "f41f4d077d01885b45c4baa984b834e450725707"
   version = "v0.5.0"
@@ -241,6 +244,7 @@
   input-imports = [
     "github.com/go-sql-driver/mysql",
     "github.com/percona/exporter_shared",
+    "github.com/percona/exporter_shared/helpers",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_model/go",
     "github.com/prometheus/common/log",
