@@ -15,7 +15,7 @@ var setupTestEnvOnce sync.Once
 func setupTestEnv(tb testing.TB) {
 	setupTestEnvOnce.Do(func() {
 		// wait up to 30 seconds for ProxySQL to become available
-		exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", false, false, false, false, false, false)
+		exporter := NewExporter("proxysql-admin:proxysql-admin@tcp(127.0.0.1:6032)/", false, false, false, false, false, false)
 		var db *sql.DB
 		var err error
 		for i := 0; i < 30; i++ {
@@ -31,8 +31,8 @@ func setupTestEnv(tb testing.TB) {
 		// configure ProxySQL
 		for _, q := range strings.Split(`
 			DELETE FROM mysql_servers;
-			INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (1, 'mysql', 3306);
-			INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (1, 'percona-server', 3306);
+			INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (1, 'master', 3306);
+			INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (1, 'slave', 3306);
 			LOAD MYSQL SERVERS TO RUNTIME;
 			SAVE MYSQL SERVERS TO DISK;
 

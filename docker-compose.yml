@@ -14,8 +14,10 @@ services:
       - CLUSTER_NAME=dummy
       - DISCOVERY_SERVICE=dummy
     ports:
-      - 127.0.0.1:13306:3306  # user interface
-      - 127.0.0.1:16032:6032  # admin interface
+      - 127.0.0.1:3306:3306  # user interface
+      - 127.0.0.1:6032:6032  # admin interface
+    volumes:
+      - ./testdata/${PROXYSQL_CNF:-proxysql1.cnf}:${PROXYSQL_CNF_DEST:-/etc/proxysql.cnf}:ro
 
   master:
     image: ${MASTER_IMAGE:-percona:5.7}

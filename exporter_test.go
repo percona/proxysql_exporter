@@ -588,7 +588,7 @@ func TestExporter(t *testing.T) {
 	setupTestEnv(t)
 
 	// wait up to 30 seconds for ProxySQL to become available
-	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true, true, true, true)
+	exporter := NewExporter("proxysql-admin:proxysql-admin@tcp(127.0.0.1:6032)/", true, true, true, true, true, true)
 
 	convey.Convey("Metrics descriptions", t, convey.FailureContinues, func(cv convey.C) {
 		ch := make(chan *prometheus.Desc)

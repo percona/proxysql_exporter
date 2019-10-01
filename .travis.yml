@@ -29,11 +29,11 @@ env:
   global:
     - MASTER_IMAGE=percona:5.7
     - SLAVE_IMAGE=percona:5.7
-    - CODECOV_ENV=PROXYSQL_IMAGE,MASTER_IMAGE,SLAVE_IMAGE
+    - CODECOV_ENV=PROXYSQL_IMAGE,PROXYSQL_CNF,PROXYSQL_CNF_DEST,MASTER_IMAGE,SLAVE_IMAGE
 
   matrix:
-    - PROXYSQL_IMAGE=percona/proxysql:latest
-    - PROXYSQL_IMAGE=percona/proxysql2:latest
+    - PROXYSQL_IMAGE=percona/proxysql:latest  PROXYSQL_CNF=proxysql1.cnf PROXYSQL_CNF_DEST=/etc/proxysql.cnf
+    - PROXYSQL_IMAGE=percona/proxysql2:latest PROXYSQL_CNF=proxysql2.cnf PROXYSQL_CNF_DEST=/etc/proxysql/proxysql.cnf
 
 before_script:
   - docker --version
