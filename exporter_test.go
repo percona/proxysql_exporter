@@ -1,4 +1,4 @@
-// Copyright 2016-2017 Percona LLC
+// Copyright 2016-2019 Percona LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,15 +16,14 @@ package main
 
 import (
 	"errors"
-	"github.com/stretchr/testify/assert"
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
 	"gopkg.in/DATA-DOG/go-sqlmock.v1"
 )
 
@@ -586,40 +585,10 @@ func TestExporter(t *testing.T) {
 		t.Skip("-short is passed, skipping integration test")
 	}
 
+	setupTestEnv(t)
+
 	// wait up to 30 seconds for ProxySQL to become available
 	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true, true, true, true)
-	for i := 0; i < 30; i++ {
-		db, err := exporter.db()
-		if err != nil {
-			time.Sleep(time.Second)
-			continue
-		}
-
-		// configure ProxySQL
-		for _, q := range strings.Split(`
-DELETE FROM mysql_servers;
-INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (1, 'mysql', 3306);
-INSERT INTO mysql_servers(hostgroup_id, hostname, port) VALUES (1, 'percona-server', 3306);
-LOAD MYSQL SERVERS TO RUNTIME;
-SAVE MYSQL SERVERS TO DISK;
-
-DELETE FROM mysql_users;
-INSERT INTO mysql_users(username, password, default_hostgroup) VALUES ('root', '', 1);
-INSERT INTO mysql_users(username, password, default_hostgroup) VALUES ('monitor', 'monitor', 1);
-LOAD MYSQL USERS TO RUNTIME;
-SAVE MYSQL USERS TO DISK;
-`, ";") {
-			q = strings.TrimSpace(q)
-			if q == "" {
-				continue
-			}
-			_, err = db.Exec(q)
-			if err != nil {
-				t.Fatalf("Failed to execute %q\n%s", q, err)
-			}
-		}
-		break
-	}
 
 	convey.Convey("Metrics descriptions", t, convey.FailureContinues, func(cv convey.C) {
 		ch := make(chan *prometheus.Desc)

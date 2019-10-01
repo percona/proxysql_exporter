@@ -180,9 +180,12 @@
   version = "1.6.3"
 
 [[projects]]
-  digest = "1:6e7bb8be062d38ec9e9222973e81835554bfa2181b9ab29ff206514bd44fe8d2"
+  digest = "1:7096df4a9258067bb9ff5da62864a645d38dd94cd3f273ff4ab54d0de548a348"
   name = "github.com/stretchr/testify"
-  packages = ["assert"]
+  packages = [
+    "assert",
+    "require",
+  ]
   pruneopts = "NUT"
   revision = "221dbe5ed46703ee255b1da0dec05086f5035f62"
   version = "v1.4.0"
@@ -244,6 +247,7 @@
     "github.com/prometheus/common/version",
     "github.com/smartystreets/goconvey/convey",
     "github.com/stretchr/testify/assert",
+    "github.com/stretchr/testify/require",
     "gopkg.in/DATA-DOG/go-sqlmock.v1",
   ]
   solver-name = "gps-cdcl"

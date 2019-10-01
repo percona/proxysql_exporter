@@ -24,8 +24,16 @@ before_cache:
   # - go clean -cache
 
 env:
-  - PROXYSQL_IMAGE=percona/proxysql:latest
-  - PROXYSQL_IMAGE=percona/proxysql2:latest
+  fast_finish: true
+
+  global:
+    - MASTER_IMAGE=percona:5.7
+    - SLAVE_IMAGE=percona:5.7
+    - CODECOV_ENV=PROXYSQL_IMAGE,MASTER_IMAGE,SLAVE_IMAGE
+
+  matrix:
+    - PROXYSQL_IMAGE=percona/proxysql:latest
+    - PROXYSQL_IMAGE=percona/proxysql2:latest
 
 before_script:
   - docker --version

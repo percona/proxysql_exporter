@@ -1,4 +1,4 @@
-// Copyright 2016-2017 Percona LLC
+// Copyright 2016-2019 Percona LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -139,10 +139,16 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 func (e *Exporter) db() (*sql.DB, error) {
 	db, err := sql.Open("mysql", e.dsn)
-	if err == nil {
-		err = db.Ping()
+	if err != nil {
+		return nil, err
 	}
-	return db, err
+
+	if err = db.Ping(); err != nil {
+		db.Close()
+		return nil, err
+	}
+
+	return db, nil
 }
 
 func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
@@ -158,14 +164,12 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 	}(time.Now())
 
 	db, err := e.db()
-	if db != nil {
-		defer db.Close()
-	}
 	if err != nil {
 		log.Errorln("Error opening connection to ProxySQL:", err)
 		e.proxysqlUp.Set(0)
 		return
 	}
+	defer db.Close()
 	e.proxysqlUp.Set(1)
 
 	if e.scrapeMySQLGlobal {
