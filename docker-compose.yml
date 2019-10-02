@@ -21,6 +21,8 @@ services:
 
   master:
     image: ${MASTER_IMAGE:-percona:5.7}
+    command: >
+      --server-id=1 --log-bin=binlog
     environment:
       - MYSQL_ALLOW_EMPTY_PASSWORD=yes
       - MYSQL_USER=monitor
@@ -32,12 +34,16 @@ services:
 
   slave:
     image: ${SLAVE_IMAGE:-percona:5.7}
+    command: >
+      --server-id=2 --log-bin=binlog
     environment:
       - MYSQL_ALLOW_EMPTY_PASSWORD=yes
       - MYSQL_USER=monitor
       - MYSQL_PASSWORD=monitor
     ports:
       - 127.0.0.1:3308:3306
+    volumes:
+      - test_db_mysql:/docker-entrypoint-initdb.d/:ro
 
 volumes:
   test_db_mysql:
