@@ -47,13 +47,13 @@ type Metric struct {
 }
 
 // ReadMetric extracts details from Prometheus metric.
-func ReadMetric(m prometheus.Metric) *Metric {
+func ReadMetric(metric prometheus.Metric) *Metric {
 	pb := &dto.Metric{}
-	if err := m.Write(pb); err != nil {
+	if err := metric.Write(pb); err != nil {
 		panic(err)
 	}
 
-	name, help := getNameAndHelp(m.Desc())
+	name, help := getNameAndHelp(metric.Desc())
 	labels := make(prometheus.Labels, len(pb.Label))
 	for _, v := range pb.Label {
 		labels[v.GetName()] = v.GetValue()
@@ -68,4 +68,13 @@ func ReadMetric(m prometheus.Metric) *Metric {
 		return &Metric{name, help, labels, dto.MetricType_UNTYPED, pb.GetUntyped().GetValue()}
 	}
 	panic("Unsupported metric type")
+}
+
+// ReadMetrics extracts details from Prometheus metrics.
+func ReadMetrics(metrics []prometheus.Metric) []*Metric {
+	res := make([]*Metric, len(metrics))
+	for i, m := range metrics {
+		res[i] = ReadMetric(m)
+	}
+	return res
 }

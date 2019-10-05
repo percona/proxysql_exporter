@@ -39,7 +39,7 @@ func (c *collector) Collect(ch chan<- prometheus.Metric) {
 
 // Format converts a slice of Prometheus metrics to strings in text exposition format.
 func Format(metrics []prometheus.Metric) []string {
-	r := prometheus.NewRegistry()
+	r := prometheus.NewPedanticRegistry()
 	r.MustRegister(&collector{metrics: metrics})
 	families, err := r.Gather()
 	if err != nil {

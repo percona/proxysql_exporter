@@ -14,8 +14,8 @@ services:
       - CLUSTER_NAME=dummy
       - DISCOVERY_SERVICE=dummy
     ports:
-      - 127.0.0.1:3306:3306  # user interface
-      - 127.0.0.1:6032:6032  # admin interface
+      - 3306:3306  # user interface
+      - 6032:6032  # admin interface
     volumes:
       - ./testdata/${PROXYSQL_CNF:-proxysql1.cnf}:${PROXYSQL_CNF_DEST:-/etc/proxysql.cnf}:ro
 
@@ -28,7 +28,7 @@ services:
       - MYSQL_USER=monitor
       - MYSQL_PASSWORD=monitor
     ports:
-      - 127.0.0.1:3307:3306
+      - 3307:3306
     volumes:
       - test_db_mysql:/docker-entrypoint-initdb.d/:ro
 
@@ -41,7 +41,7 @@ services:
       - MYSQL_USER=monitor
       - MYSQL_PASSWORD=monitor
     ports:
-      - 127.0.0.1:3308:3306
+      - 3308:3306
     volumes:
       - test_db_mysql:/docker-entrypoint-initdb.d/:ro
 

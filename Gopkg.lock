@@ -85,15 +85,15 @@
   version = "v1.0.1"
 
 [[projects]]
-  digest = "1:2e1790fe0d97c770398058c454ef4283703c0c77d88ddb127884a4e4fa058ac8"
+  branch = "develop"
+  digest = "1:74b50fb8a16b985f057f41ba3d9e4856fe2c8dc7fc19d6afa83a5ba5088799ce"
   name = "github.com/percona/exporter_shared"
   packages = [
     ".",
     "helpers",
   ]
   pruneopts = "NUT"
-  revision = "f41f4d077d01885b45c4baa984b834e450725707"
-  version = "v0.5.0"
+  revision = "28cf983f790b92684eb32656647a2193d3d86e01"
 
 [[projects]]
   digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
@@ -124,7 +124,7 @@
   revision = "14fe0d1b01d4d5fc031dd4bec1823bd3ebbe8016"
 
 [[projects]]
-  digest = "1:e8a0bc9da663fc125f774c5ec3f127cc5e18c90983a521d7c375a0e5e44fbbc8"
+  digest = "1:22b0ad1d8dbb7f1961d53f45e69743b2f92a0e076901401b9fed78c0eb058879"
   name = "github.com/prometheus/common"
   packages = [
     "expfmt",
@@ -134,8 +134,8 @@
     "version",
   ]
   pruneopts = "NUT"
-  revision = "31bed53e4047fd6c510e43a941f90cb31be0972a"
-  version = "v0.6.0"
+  revision = "287d3e634a1e550c9e463dd7e5a75a422c614505"
+  version = "v0.7.0"
 
 [[projects]]
   digest = "1:bbbacd138cb711e328390a2d4bfaca1a41a8575f3c893450bf2ea1b74acdc7be"
