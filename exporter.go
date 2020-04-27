@@ -16,6 +16,7 @@ package main
 
 import (
 	"database/sql"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -29,17 +30,18 @@ const namespace = "proxysql"
 // Exporter collects ProxySQL metrics.
 // It implements prometheus.Collector interface.
 type Exporter struct {
-	dsn                            string
-	scrapeMySQLGlobal              bool
-	scrapeMySQLConnectionPool      bool
-	scrapeMySQLConnectionList      bool
-	scrapeDetailedMySQLProcessList bool
-	scrapeMemoryMetrics            bool
-	scrapesTotal                   prometheus.Counter
-	scrapeErrorsTotal              *prometheus.CounterVec
-	lastScrapeError                prometheus.Gauge
-	lastScrapeDurationSeconds      prometheus.Gauge
-	proxysqlUp                     prometheus.Gauge
+	dsn                              string
+	scrapeMySQLGlobal                bool
+	scrapeMySQLConnectionPool        bool
+	scrapeMySQLConnectionList        bool
+	scrapeDetailedMySQLProcessList   bool
+	scrapeMemoryMetrics              bool
+	scrapeMySQLCommandCounterMetrics bool
+	scrapesTotal                     prometheus.Counter
+	scrapeErrorsTotal                *prometheus.CounterVec
+	lastScrapeError                  prometheus.Gauge
+	lastScrapeDurationSeconds        prometheus.Gauge
+	proxysqlUp                       prometheus.Gauge
 }
 
 // NewExporter returns a new ProxySQL exporter for the provided DSN.
@@ -51,14 +53,16 @@ func NewExporter(
 	scrapeMySQLConnectionList bool,
 	scrapeDetailedMySQLProcessList bool,
 	scrapeMemoryMetrics bool,
+	scrapeMySQLCommandCounterMetrics bool,
 ) *Exporter {
 	return &Exporter{
-		dsn:                            dsn,
-		scrapeMySQLGlobal:              scrapeMySQLGlobal,
-		scrapeMySQLConnectionPool:      scrapeMySQLConnectionPool,
-		scrapeMySQLConnectionList:      scrapeMySQLConnectionList,
-		scrapeDetailedMySQLProcessList: scrapeDetailedMySQLProcessList,
-		scrapeMemoryMetrics:            scrapeMemoryMetrics,
+		dsn:                              dsn,
+		scrapeMySQLGlobal:                scrapeMySQLGlobal,
+		scrapeMySQLConnectionPool:        scrapeMySQLConnectionPool,
+		scrapeMySQLConnectionList:        scrapeMySQLConnectionList,
+		scrapeDetailedMySQLProcessList:   scrapeDetailedMySQLProcessList,
+		scrapeMemoryMetrics:              scrapeMemoryMetrics,
+		scrapeMySQLCommandCounterMetrics: scrapeMySQLCommandCounterMetrics,
 
 		scrapesTotal: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
@@ -193,6 +197,12 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 		if err = scrapeMemoryMetrics(db, ch); err != nil {
 			log.Errorln("Error scraping for collect.stats_memory_metrics", err)
 			e.scrapeErrorsTotal.WithLabelValues("collect.stats_memory_metrics").Inc()
+		}
+	}
+	if e.scrapeMySQLCommandCounterMetrics {
+		if err = scrapeMySQLCommandCounterMetrics(db, ch); err != nil {
+			log.Errorln("Error scraping for collect.stats_command_counter_metrics", err)
+			e.scrapeErrorsTotal.WithLabelValues("collect.stats_command_counter_metrics").Inc()
 		}
 	}
 }
@@ -449,7 +459,6 @@ func scrapeDetailedMySQLConnectionList(db *sql.DB, ch chan<- prometheus.Metric) 
 	}
 	defer rows.Close()
 
-
 	for rows.Next() {
 		var res processListResult
 
@@ -476,48 +485,138 @@ func scrapeDetailedMySQLConnectionList(db *sql.DB, ch chan<- prometheus.Metric) 
 	return rows.Err()
 }
 
+const mysqlCommandCounterQuery = `
+    select
+        Command, Total_Time_us, Total_cnt, cnt_100us, cnt_500us, cnt_1ms, cnt_5ms, cnt_10ms, cnt_50ms,
+        cnt_100ms, cnt_500ms, cnt_1s, cnt_5s, cnt_10s, cnt_INFs
+    from
+        stats_mysql_commands_counters
+    where Command in (
+        'CREATE_TEMPORARY',
+        'DELETE',
+        'INSERT',
+        'LOCK_TABLES',
+        'SELECT',
+        'SELECT_FOR_UPDATE',
+        'UPDATE'
+    );
+`
+
+var mysqlCommandContuerMetrics = map[string]*metric{}
+
+type mysqlCommandCounterResult struct {
+	Command     string
+	TotalTimeUs float64
+	TotalCnt    uint64
+	cnt100us    uint64
+	cnt500us    uint64
+	cnt1ms      uint64
+	cnt5ms      uint64
+	cnt10ms     uint64
+	cnt50ms     uint64
+	cnt100ms    uint64
+	cnt500ms    uint64
+	cnt1s       uint64
+	cnt5s       uint64
+	cnt10s      uint64
+	cntINFs     uint64
+}
+
+func scrapeMySQLCommandCounterMetrics(db *sql.DB, ch chan<- prometheus.Metric) error {
+	rows, err := db.Query(mysqlCommandCounterQuery)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var res mysqlCommandCounterResult
+
+		err := rows.Scan(
+			&res.Command, &res.TotalTimeUs, &res.TotalCnt, &res.cnt100us, &res.cnt500us, &res.cnt1ms, &res.cnt5ms, &res.cnt10ms,
+			&res.cnt50ms, &res.cnt100ms, &res.cnt500ms, &res.cnt1s, &res.cnt5s, &res.cnt10s, &res.cntINFs,
+		)
+		if err != nil {
+			return err
+		}
+
+		ch <- prometheus.MustNewConstHistogram(
+			prometheus.NewDesc(
+				prometheus.BuildFQName(namespace, "mysql_command_counter", "latency_milliseconds"),
+				"histogram over a commands latency in ms",
+				[]string{"command"},
+				prometheus.Labels{},
+			),
+			res.TotalCnt, res.TotalTimeUs,
+			map[float64]uint64{
+				.1: res.cnt100us,
+				.5: res.cnt500us + res.cnt100us,
+				1:  res.cnt1ms + res.cnt500us + res.cnt100us,
+				5:  res.cnt5ms + res.cnt1ms + res.cnt500us + res.cnt100us,
+				10: res.cnt10ms + res.cnt5ms + res.cnt1ms + res.cnt500us + res.cnt100us,
+				50: res.cnt50ms + res.cnt10ms + res.cnt5ms + res.cnt1ms + res.cnt500us + res.cnt100us,
+				100: res.cnt100ms + res.cnt50ms + res.cnt10ms + res.cnt5ms + res.cnt1ms + res.cnt500us +
+					res.cnt100us,
+				500: res.cnt500ms + res.cnt100ms + res.cnt50ms + res.cnt10ms + res.cnt5ms + res.cnt1ms +
+					res.cnt500us + res.cnt100us,
+				1000: res.cnt1s + res.cnt500ms + res.cnt100ms + res.cnt50ms + res.cnt10ms + res.cnt5ms +
+					res.cnt1ms + res.cnt500us + res.cnt100us,
+				5000: res.cnt5s + res.cnt1s + res.cnt500ms + res.cnt100ms + res.cnt50ms + res.cnt10ms +
+					res.cnt5ms + res.cnt1ms + res.cnt500us + res.cnt100us,
+				10000: res.cnt10s + res.cnt5s + res.cnt1s + res.cnt500ms + res.cnt100ms + res.cnt50ms +
+					res.cnt10ms + res.cnt5ms + res.cnt1ms + res.cnt500us + res.cnt100us,
+				math.Inf(1): res.cntINFs + res.cnt10s + res.cnt5s + res.cnt1s + res.cnt500ms + res.cnt100ms +
+					res.cnt50ms + res.cnt10ms + res.cnt5ms + res.cnt1ms + res.cnt500us + res.cnt100us,
+			},
+			res.Command,
+		)
+	}
+
+	return rows.Err()
+}
+
 const memoryMetricsQuery = "select Variable_Name, Variable_Value  from stats_memory_metrics"
 
 var memoryMetricsMetrics = map[string]*metric{
 	"jemalloc_allocated": {
-		name: "jemalloc_allocated",
+		name:      "jemalloc_allocated",
 		valueType: prometheus.GaugeValue,
-		help: "bytes allocated by the application",
+		help:      "bytes allocated by the application",
 	},
 	"jemalloc_active": {
-		name: "jemalloc_active",
+		name:      "jemalloc_active",
 		valueType: prometheus.GaugeValue,
-		help: "bytes in pages allocated by the application",
+		help:      "bytes in pages allocated by the application",
 	},
 	"jemalloc_mapped": {
-		name: "jemalloc_mapped",
+		name:      "jemalloc_mapped",
 		valueType: prometheus.GaugeValue,
-		help: "bytes in extents mapped by the allocator",
+		help:      "bytes in extents mapped by the allocator",
 	},
 	"jemalloc_metadata": {
-		name: "jemalloc_metadata",
+		name:      "jemalloc_metadata",
 		valueType: prometheus.GaugeValue,
-		help: "bytes dedicated to metadata",
+		help:      "bytes dedicated to metadata",
 	},
 	"jemalloc_resident": {
-		name: "jemalloc_resident",
+		name:      "jemalloc_resident",
 		valueType: prometheus.GaugeValue,
-		help: "bytes in physically resident data pages mapped by the allocator",
+		help:      "bytes in physically resident data pages mapped by the allocator",
 	},
 	"auth_memory": {
-		name: "auth_memory",
+		name:      "auth_memory",
 		valueType: prometheus.GaugeValue,
-		help: "memory used by the authentication module to store user credentials and attributes",
+		help:      "memory used by the authentication module to store user credentials and attributes",
 	},
 	"sqlite3_memory_bytes": {
-		name: "sqlite3_memory_bytes",
+		name:      "sqlite3_memory_bytes",
 		valueType: prometheus.GaugeValue,
-		help: "memory used by the embedded SQLite",
+		help:      "memory used by the embedded SQLite",
 	},
 	"query_digest_memory": {
-		name: "query_digest_memory",
+		name:      "query_digest_memory",
 		valueType: prometheus.GaugeValue,
-		help: "memory used to store data related to stats_mysql_query_digest",
+		help:      "memory used to store data related to stats_mysql_query_digest",
 	},
 }
 
