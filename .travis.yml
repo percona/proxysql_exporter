@@ -29,7 +29,14 @@ env:
   - PROXYSQL_IMAGE=percona/proxysql:1.2.1
   - PROXYSQL_IMAGE=perconalab/proxysql:1.3.6
 
+install:
+  # install reviewdog and golangci-lin
+  - curl -sfL https://raw.githubusercontent.com/reviewdog/reviewdog/master/install.sh| sh -s
+  - curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s latest
+
 before_script:
+  # static analyze
+  - bin/golangci-lint run -c=.golangci.yml --out-format=line-number | bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-check
   - docker --version
   - docker-compose --version
   - docker-compose up -d
