@@ -273,7 +273,7 @@ const mySQLconnectionPoolQuery = "SELECT hostgroup, srv_host, srv_port, * FROM s
 // key - column name in lowercase.
 var mySQLconnectionPoolMetrics = map[string]*metric{
 	"status": {"status", prometheus.GaugeValue,
-		"The status of the backend server (1 - ONLINE, 2 - SHUNNED, 3 - OFFLINE_SOFT, 4 - OFFLINE_HARD)."},
+		"The status of the backend server (1 - ONLINE, 2 - SHUNNED, 3 - OFFLINE_SOFT, 4 - OFFLINE_HARD, 5 - SHUNNED_REPLICATION_LAG)."},
 	"connused": {"conn_used", prometheus.GaugeValue,
 		"How many connections are currently used by ProxySQL for sending queries to the backend server."},
 	"connfree": {"conn_free", prometheus.GaugeValue,
@@ -342,6 +342,8 @@ func scrapeMySQLConnectionPool(db *sql.DB, ch chan<- prometheus.Metric) error {
 					value = 3
 				case "OFFLINE_HARD":
 					value = 4
+				case "SHUNNED_REPLICATION_LAG":
+					value = 5
 				}
 			default:
 				// We could use rows.ColumnTypes() when mysql driver supports them:
