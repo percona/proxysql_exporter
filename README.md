@@ -4,6 +4,7 @@
 [![Build Status](https://travis-ci.org/percona/proxysql_exporter.svg?branch=master)](https://travis-ci.org/percona/proxysql_exporter)
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/proxysql_exporter)](https://goreportcard.com/report/github.com/percona/proxysql_exporter)
 [![CLA assistant](https://cla-assistant.percona.com/readme/badge/percona/proxysql_exporter)](https://cla-assistant.percona.com/percona/proxysql_exporter)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fpercona%2Fproxysql_exporter.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fpercona%2Fproxysql_exporter?ref=badge_shield)
 Prometheus exporter for [ProxySQL](https://github.com/sysown/proxysql) performance data.
 Supported versions: 1.2 and 1.3.
 
@@ -82,3 +83,7 @@ As a general rule of thumb, please try to create bug reports that are:
 - *Specific.* Include as much detail as possible: which version, what environment, etc.
 - *Unique.* Do not duplicate existing tickets.
 - *Scoped to a Single Bug.* One bug per report.
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fpercona%2Fproxysql_exporter.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fpercona%2Fproxysql_exporter?ref=badge_large)
