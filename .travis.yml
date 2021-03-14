@@ -5,7 +5,7 @@ services:
   - docker
 
 go:
-  - 1.13.x
+  - 1.15.x
   - 1.14.x
   - master
 
@@ -27,7 +27,7 @@ before_cache:
 
 env:
   global:
-    - secure: "lJx6ldW011Cqa4AYZuP0yeujWSbVP3AdJDSQbFhXGdfMy2MZ8O/va30a5MVxT0bzUto/JS7lljFXfFYctnRD1pWrUNVM9/5JWxAkPeiMjI/2/ueEtxhucaj5gWUStdXts/mvB85W9yVdzCaeCTwhhPI43+T+QprUXAdAQRooNtkAzKpmZQTfYhkg6QyTQsXc+y0OEc5vXdA/plmmifeCu2uLDrxZJaEMAI9y4mXI0bzuFbHytqp8e5NdTZKddSZGpBuPqrY3CyrcZViFsBBxHrwZr7qFFh8RW5AROcGDLN3p06V/WZXQ+xrx2VjNcHVVPy7QD6UtkTUX+s5sg2KXfulHCqF6RZcYIUlb/1IQPOy+cOwqQ9hg1543OpfDhtlEcFyTReNOzJy8jG+cHDN6uBikhfY+xV6v+eBxg+YB7Bu2Jq6Lr0bc8pOd3UKSnJRy50tkjF0UQkxV+gKe8J/hkhszB4XcSBGeBtmMsuU470EOBCy2uiYPPUpadO+PMJyH9kgsvirknE4BjLp6xKn3O7WiCV9IJqdeOm62ItvMz5SiJ8MH8in8zn7zjm0jlHVCGWMAx8PyJSZ1C1xS3gxw601V68OX59rLSfJkzJcN10fS9PjcdKavIAxc0gRoDm/lgRQPCSKhkasqP0jVsnpowtaVv6JLtniGSYNw3ov2s0s="
+    - secure: "w5CuQ8yiQ1U/zhHJ0SjiXkYGu/5AAYgWf7x3x+VkDnzOW2mXS/JiE9RKDMbVFd+wGr0OdFpVMB4NQVQBVLwafPtEHQsMrRaQTf6puHHNwlXoFKnzqF9adtpRId/8aGfbT+PbNsW4dtIAimlaKr48kmmImD/196Ef0RvVBj2oLurOzlDWErC2xdvPyC7E68y54gLD4OXrSr7f4KVPeJ4usbcqr8qc5OqlFyURL5gRPiDUl4BUkLXrmlk4huLMa1Z3xf5YcghPd5h4aF15gnBNJK4Cn3ZW1XX6Rm5/MVuOfUuTfBtm75I76qT4O1PD7SoekH2N5fldLPd5et2IyuPIsEjsC9tAajzeQeazWr52brntcdJuz4aaYbACjup8tpTHsefWILbvoR9Avpe0P2cNKarxkYNJ8HxzujTmxG7N1Wruu/1Cd3jKfWQDYCw40/AFkSb2QIVsCLCe4vjqVTCNRanYmbcxL47tQuT4yjHCVdQ9IHE7N/abvOeNFxk93aeH+bqRQfrxLfQm+FD6js40axfocwL4uP8b3EmxfoTEyvSPofyhnKMd6OUOUIt9mgQj1RPqFnoPHzodRWqBhQ/86DaK8ZSGYqgivddbjr0bSBu/SbV/Ig4L4MgNXuYu30FXXzvXLfZNO+uz95QsQeYqfe1lmQZVhpiCs4In8BGgH+4="
   matrix:
     - PROXYSQL_IMAGE=percona/proxysql:1.2.1
     - PROXYSQL_IMAGE=perconalab/proxysql:1.3.6
