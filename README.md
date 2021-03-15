@@ -60,7 +60,7 @@ Name                 | Description
 
 ## Visualizing
 
-There is a Grafana dashboard for ProxySQL available as a part of [PMM](https://www.percona.com/doc/percona-monitoring-and-management/index.html) project, you can see the demo [here](https://pmmdemo.percona.com/graph/dashboard/db/proxysql-overview).
+There is a Grafana dashboard for ProxySQL available as a part of [PMM](https://www.percona.com/doc/percona-monitoring-and-management/index.html) project, you can see the demo [here](https://pmmdemo.percona.com/graph/d/proxysql-instance-summary/proxysql-instance-summary).
 
 
 ## Submitting Bug Reports
