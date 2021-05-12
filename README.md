@@ -1,7 +1,6 @@
 # Percona ProxySQL Exporter
 
-[![Release](https://github-release-version.herokuapp.com/github/percona/proxysql_exporter/release.svg?style=flat)](https://github.com/percona/proxysql_exporter/releases/latest)
-[![Build Status](https://travis-ci.org/percona/proxysql_exporter.svg?branch=master)](https://travis-ci.org/percona/proxysql_exporter)
+[![Build Status](https://travis-ci.com/percona/proxysql_exporter.svg?branch=master)](https://travis-ci.com/percona/proxysql_exporter)
 [![Go Report Card](https://goreportcard.com/badge/github.com/percona/proxysql_exporter)](https://goreportcard.com/report/github.com/percona/proxysql_exporter)
 [![CLA assistant](https://cla-assistant.percona.com/readme/badge/percona/proxysql_exporter)](https://cla-assistant.percona.com/percona/proxysql_exporter)
 Prometheus exporter for [ProxySQL](https://github.com/sysown/proxysql) performance data.
@@ -59,7 +58,7 @@ Name                 | Description
 
 ## Visualizing
 
-There is a Grafana dashboard for ProxySQL available as a part of [PMM](https://www.percona.com/doc/percona-monitoring-and-management/index.html) project, you can see the demo [here](https://pmmdemo.percona.com/graph/d/proxysql-instance-summary/proxysql-instance-summary).
+There is a Grafana dashboard for ProxySQL available as a part of [PMM](https://www.percona.com/doc/percona-monitoring-and-management/2.x/index.html) project, you can see the demo [here](https://pmmdemo.percona.com/graph/d/proxysql-instance-summary/proxysql-instance-summary).
 
 
 ## Submitting Bug Reports
