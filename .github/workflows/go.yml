@@ -1,0 +1,64 @@
+name: Go
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: Test
+    strategy:
+      matrix:
+        go-version:
+          - 1.15
+          - 1.16
+        proxysql-image:
+          - percona/proxysql:1.2.1
+          - perconalab/proxysql:1.3.6
+        include:
+          - go-version: tip
+            os: ubuntu-latest
+            may-fail: true
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Go release
+      if: matrix.go-version != 'tip'
+      uses: percona-platform/setup-go@v2
+      with:
+        go-version: ${{ matrix.go-version }}
+    - name: Set up Go tip
+      if: matrix.go-version == 'tip'
+      env:
+        # to avoid error due to `go version` accepting -v flag with an argument since 1.15
+        GOFLAGS: ""
+      run: |
+        git clone --depth=1 https://go.googlesource.com/go $HOME/gotip
+        cd $HOME/gotip/src
+        ./make.bash
+        echo "GOROOT=$HOME/gotip" >> $GITHUB_ENV
+        echo "$HOME/gotip/bin" >> $GITHUB_PATH
+    - name: Checkout code
+      uses: percona-platform/checkout@v2
+    - name: Build
+      run: make build
+    - name: Run checks
+      run: |
+        go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.40.1
+        go get github.com/reviewdog/reviewdog/cmd/reviewdog@v0.11.0
+        golangci-lint run -c=.golangci-required.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} reviewdog -f=golangci-lint -level=error -reporter=github-pr-check
+        golangci-lint run -c=.golangci.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} reviewdog -f=golangci-lint -level=error -reporter=github-pr-review
+        make format
+        make build
+    - name: Run Tests
+      env:
+        PROXYSQL_IMAGE: ${{ matrix.proxysql-image }}
+      run: |
+        docker --version
+        docker compose up -d
+        make testall
+    - name: Run debug commands on failure
+      if: ${{ failure() }}
+      run: |
+        env
+        go version
+        go env
+        pwd
+        git status
