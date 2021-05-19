@@ -41,7 +41,7 @@ var (
 	mysqlConnectionPoolF         = flag.Bool("collect.mysql_connection_pool", true, "Collect from stats_mysql_connection_pool.")
 	mysqlConnectionListF         = flag.Bool("collect.mysql_connection_list", true, "Collect connection list from stats_mysql_processlist.")
 	mysqlDetailedConnectionListF = flag.Bool("collect.detailed.stats_mysql_processlist", false, "Collect detailed connection list from stats_mysql_processlist.")
-	mysqlCommandCounter          = flag.Bool("collect.stats_command_counter", true, "Collect histograms over command latency")
+	mysqlCommandCounter          = flag.Bool("collect.stats_command_counter", false, "Collect histograms over command latency")
 	memoryMetricsF               = flag.Bool("collect.stats_memory_metrics", false, "Collect memory metrics from stats_memory_metrics.")
 )
 
