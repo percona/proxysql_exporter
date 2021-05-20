@@ -68,7 +68,8 @@ func main() {
 
 	log.Infof("Starting %s %s for %s", program, version.Version, dsn)
 
-	exporter := NewExporter(dsn, *mysqlStatusF, *mysqlConnectionPoolF, *mysqlConnectionListF, *mysqlDetailedConnectionListF, *memoryMetricsF, *mysqlCommandCounter)
+	exporter := NewExporter(dsn, *mysqlStatusF, *mysqlConnectionPoolF, *mysqlConnectionListF, *mysqlDetailedConnectionListF,
+		*memoryMetricsF, *mysqlCommandCounter)
 	prometheus.MustRegister(exporter)
 
 	exporter_shared.RunServer("ProxySQL", *listenAddressF, *telemetryPathF, promhttp.ContinueOnError)

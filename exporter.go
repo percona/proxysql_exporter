@@ -502,8 +502,6 @@ const mysqlCommandCounterQuery = `
     );
 `
 
-var mysqlCommandContuerMetrics = map[string]*metric{}
-
 type mysqlCommandCounterResult struct {
 	Command     string
 	TotalTimeUs float64
