@@ -41,10 +41,10 @@ jobs:
       run: make build
     - name: Run checks
       run: |
-        go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.40.1
-        go get github.com/reviewdog/reviewdog/cmd/reviewdog@v0.11.0
-        golangci-lint run -c=.golangci-required.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} reviewdog -f=golangci-lint -level=error -reporter=github-pr-check
-        golangci-lint run -c=.golangci.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} reviewdog -f=golangci-lint -level=error -reporter=github-pr-review
+        go build -modfile=go.mod -o bin/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
+        go build -modfile=go.mod -o bin/reviewdog github.com/reviewdog/reviewdog/cmd/reviewdog
+        bin/golangci-lint run -c=.golangci-required.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-check
+        bin/golangci-lint run -c=.golangci.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-review
         make format
         make build
     - name: Run Tests

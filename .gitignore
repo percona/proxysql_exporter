@@ -1,3 +1,5 @@
 proxysql_exporter
 coverage.txt
 .idea
+.vscode/
+bin/
