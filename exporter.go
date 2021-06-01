@@ -486,12 +486,12 @@ func scrapeDetailedMySQLConnectionList(db *sql.DB, ch chan<- prometheus.Metric) 
 }
 
 const mysqlCommandCounterQuery = `
-    select
+    SELECT
         Command, Total_Time_us, Total_cnt, cnt_100us, cnt_500us, cnt_1ms, cnt_5ms, cnt_10ms, cnt_50ms,
         cnt_100ms, cnt_500ms, cnt_1s, cnt_5s, cnt_10s, cnt_INFs
-    from
+    FROM
         stats_mysql_commands_counters
-    where Command in (
+    WHERE Command IN (
         'CREATE_TEMPORARY',
         'DELETE',
         'INSERT',
@@ -499,7 +499,7 @@ const mysqlCommandCounterQuery = `
         'SELECT',
         'SELECT_FOR_UPDATE',
         'UPDATE'
-    );
+    )
 `
 
 type mysqlCommandCounterResult struct {

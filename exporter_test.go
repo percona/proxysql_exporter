@@ -17,6 +17,7 @@ package main
 import (
 	"errors"
 	"github.com/stretchr/testify/assert"
+	"math"
 	"regexp"
 	"strings"
 	"testing"
@@ -164,6 +165,65 @@ func TestScrapeMySQLGlobalError(t *testing.T) {
 	}()
 
 	_ = *readMetric(<-ch2)
+}
+
+func TestScrapeMySQLCommandCounter(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("error opening a stub database connection: %s", err)
+	}
+	defer db.Close()
+
+	columns := []string{"Command", "Total_Time_us", "Total_cnt", "cnt_100us", "cnt_500us", "cnt_1ms", "cnt_5ms", "cnt_10ms",
+		"cnt_50ms", "cnt_100ms", "cnt_500ms", "cnt_1s", "cnt_5s", "cnt_10s", "cnt_INFs"}
+	rows := sqlmock.NewRows(columns).
+		AddRow("CREATE_TEMPORARY", "2400", "30", "2", "1", "1", "2", "2", "4", "1", "5", "2", "1", "0", "1")
+	mock.ExpectQuery(sanitizeQuery(mysqlCommandCounterQuery)).WillReturnRows(rows)
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		if err = scrapeMySQLCommandCounterMetrics(db, ch); err != nil {
+			t.Errorf("error calling function on test: %s", err)
+		}
+		close(ch)
+	}()
+
+	gotPb := &dto.Metric{}
+	gotHistogram := <-ch
+	gotHistogram.Write(gotPb)
+
+	expectedCounts := map[float64]uint64{
+		.1: 2,
+		.5: 3,
+		1:  4,
+		5:  6,
+		10: 8,
+		50: 12,
+		100: 13,
+		500: 18,
+		1000: 20,
+		5000: 21,
+		10000: 21,
+		math.Inf(1): 22,
+	}
+
+	expectedHistogram := prometheus.MustNewConstHistogram(prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "mysql_command_counter", "latency_milliseconds"),
+		"histogram over a commands latency in ms",
+		[]string{},
+		nil,
+	), 30, 2400, expectedCounts)
+	expectedPb := &dto.Metric{}
+	expectedHistogram.Write(expectedPb)
+
+	convey.Convey("Histogram comparison", t, func() {
+			convey.So(expectedPb.Histogram, convey.ShouldResemble, gotPb.Histogram)
+	})
+
+	// Ensure all SQL queries were executed
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
 }
 
 func TestScrapeMySQLConnectionPool(t *testing.T) {
