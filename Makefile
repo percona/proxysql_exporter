@@ -29,7 +29,7 @@ all: format build test
 
 style:
 	@echo ">> checking code style"
-	@! gofmt -d $(shell find . -path -prune -o -name '*.go' -print) | grep '^'
+	@! gofmt -d $(shell find . -path ./... -prune -o -name '*.go' -print) | grep '^'
 
 test:
 	@echo ">> running tests"
