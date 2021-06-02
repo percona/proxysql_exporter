@@ -181,6 +181,7 @@ func TestScrapeMySQLCommandCounter(t *testing.T) {
 	mock.ExpectQuery(sanitizeQuery(mysqlCommandCounterQuery)).WillReturnRows(rows)
 
 	ch := make(chan prometheus.Metric)
+
 	go func() {
 		if err = scrapeMySQLCommandCounterMetrics(db, ch); err != nil {
 			t.Errorf("error calling function on test: %s", err)
@@ -190,20 +191,22 @@ func TestScrapeMySQLCommandCounter(t *testing.T) {
 
 	gotPb := &dto.Metric{}
 	gotHistogram := <-ch
-	gotHistogram.Write(gotPb)
+	if err := gotHistogram.Write(gotPb); err != nil {
+		t.Errorf("Error during encoding the Metric into a \"Metric\" Protocol Buffer data transmission object: %s", err)
+	}
 
 	expectedCounts := map[float64]uint64{
-		.1: 2,
-		.5: 3,
-		1:  4,
-		5:  6,
-		10: 8,
-		50: 12,
-		100: 13,
-		500: 18,
-		1000: 20,
-		5000: 21,
-		10000: 21,
+		.1:          2,
+		.5:          3,
+		1:           4,
+		5:           6,
+		10:          8,
+		50:          12,
+		100:         13,
+		500:         18,
+		1000:        20,
+		5000:        21,
+		10000:       21,
 		math.Inf(1): 22,
 	}
 
@@ -214,10 +217,12 @@ func TestScrapeMySQLCommandCounter(t *testing.T) {
 		nil,
 	), 30, 2400, expectedCounts)
 	expectedPb := &dto.Metric{}
-	expectedHistogram.Write(expectedPb)
+	if err := expectedHistogram.Write(expectedPb); err != nil {
+		t.Errorf("Error during encoding the Metric into a \"Metric\" Protocol Buffer data transmission object: %s", err)
+	}
 
 	convey.Convey("Histogram comparison", t, func() {
-			convey.So(expectedPb.Histogram, convey.ShouldResemble, gotPb.Histogram)
+		convey.So(expectedPb.Histogram, convey.ShouldResemble, gotPb.Histogram)
 	})
 
 	// Ensure all SQL queries were executed
