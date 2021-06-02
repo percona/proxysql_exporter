@@ -14,7 +14,7 @@
 
 GO           := go
 FIRST_GOPATH := $(firstword $(subst :, ,$(shell $(GO) env GOPATH)))
-PROMU        := $(FIRST_GOPATH)/bin/promu -v
+PROMU        := bin/promu -v
 pkgs          = $(shell $(GO) list ./... | grep -v /vendor/)
 
 PREFIX              ?= $(shell pwd)
@@ -62,7 +62,7 @@ docker:
 promu:
 	@GOOS=$(shell uname -s | tr A-Z a-z) \
 		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(subst aarch64,arm64,$(shell uname -m)))) \
-		$(GO) get -u github.com/prometheus/promu
+		$(GO) build -modfile=go.mod -o bin/promu github.com/prometheus/promu
 
 
 .PHONY: all style format build test vet tarball docker promu
