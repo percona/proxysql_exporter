@@ -167,19 +167,18 @@ func TestScrapeMySQLGlobalError(t *testing.T) {
 	_ = *readMetric(<-ch2)
 }
 
-func TestScrapeMySQLCommandCounter(t *testing.T) {
+func TestScrapeMySQLCommandCounter(t *testing.T) { //nolint:funlen
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("error opening a stub database connection: %s", err)
 	}
-	defer db.Close()
+	defer db.Close() //nolint:errcheck
 
 	columns := []string{"Command", "Total_Time_us", "Total_cnt", "cnt_100us", "cnt_500us", "cnt_1ms", "cnt_5ms", "cnt_10ms",
 		"cnt_50ms", "cnt_100ms", "cnt_500ms", "cnt_1s", "cnt_5s", "cnt_10s", "cnt_INFs"}
 	rows := sqlmock.NewRows(columns).
 		AddRow("CREATE_TEMPORARY", "2400", "30", "2", "1", "1", "2", "2", "4", "1", "5", "2", "1", "0", "1")
 	mock.ExpectQuery(sanitizeQuery(mysqlCommandCounterQuery)).WillReturnRows(rows)
-
 	ch := make(chan prometheus.Metric)
 
 	go func() {
