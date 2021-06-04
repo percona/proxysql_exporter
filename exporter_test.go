@@ -49,7 +49,8 @@ type metricResult struct {
 
 // https://github.com/prometheus/client_golang/issues/323
 func readMetric(m prometheus.Metric) *metricResult {
-	pb := &dto.Metric{}
+	var varPb dto.Metric
+	pb := &varPb
 	err := m.Write(pb)
 	if err != nil {
 		panic(err)
@@ -191,7 +192,9 @@ func TestScrapeMySQLCommandCounter(t *testing.T) { //nolint:funlen
 		close(ch)
 	}()
 
-	gotPb := &dto.Metric{}
+	var gotVarPb dto.Metric
+	gotPb := &gotVarPb
+
 	gotHistogram := <-ch
 	if err := gotHistogram.Write(gotPb); err != nil {
 		t.Errorf("Error during encoding the Metric into a \"Metric\" Protocol Buffer data transmission object: %s", err)
@@ -218,7 +221,9 @@ func TestScrapeMySQLCommandCounter(t *testing.T) { //nolint:funlen
 		[]string{},
 		nil,
 	), 30, 2400, expectedCounts)
-	expectedPb := &dto.Metric{}
+
+	var expectedVarPb dto.Metric
+	expectedPb := &expectedVarPb
 	if err := expectedHistogram.Write(expectedPb); err != nil {
 		t.Errorf("Error during encoding the Metric into a \"Metric\" Protocol Buffer data transmission object: %s", err)
 	}
