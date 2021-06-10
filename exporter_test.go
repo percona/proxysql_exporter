@@ -17,6 +17,7 @@ package main
 import (
 	"errors"
 	"github.com/stretchr/testify/assert"
+	"math"
 	"regexp"
 	"strings"
 	"testing"
@@ -48,7 +49,8 @@ type metricResult struct {
 
 // https://github.com/prometheus/client_golang/issues/323
 func readMetric(m prometheus.Metric) *metricResult {
-	pb := &dto.Metric{}
+	var varPb dto.Metric
+	pb := &varPb
 	err := m.Write(pb)
 	if err != nil {
 		panic(err)
@@ -67,6 +69,9 @@ func readMetric(m prometheus.Metric) *metricResult {
 	}
 	if pb.Untyped != nil {
 		return &metricResult{name, labels, pb.GetUntyped().GetValue(), dto.MetricType_UNTYPED}
+	}
+	if pb.Histogram != nil {
+		return &metricResult{name, labels, pb.GetUntyped().GetValue(), dto.MetricType_HISTOGRAM}
 	}
 	panic("Unsupported metric type")
 }
@@ -164,6 +169,73 @@ func TestScrapeMySQLGlobalError(t *testing.T) {
 	}()
 
 	_ = *readMetric(<-ch2)
+}
+
+func TestScrapeMySQLCommandCounter(t *testing.T) { //nolint:funlen
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("error opening a stub database connection: %s", err)
+	}
+	defer db.Close() //nolint:errcheck
+
+	columns := []string{"Command", "Total_Time_us", "Total_cnt", "cnt_100us", "cnt_500us", "cnt_1ms", "cnt_5ms", "cnt_10ms",
+		"cnt_50ms", "cnt_100ms", "cnt_500ms", "cnt_1s", "cnt_5s", "cnt_10s", "cnt_INFs"}
+	rows := sqlmock.NewRows(columns).
+		AddRow("CREATE_TEMPORARY", 2400, 30, 2, 1, 1, 2, 2, 4, 1, 5, 2, 1, 0, 1)
+	mock.ExpectQuery(sanitizeQuery(mysqlCommandCounterQuery)).WillReturnRows(rows)
+	ch := make(chan prometheus.Metric)
+
+	go func() {
+		if err = scrapeMySQLCommandCounterMetrics(db, ch); err != nil {
+			t.Errorf("error calling function on test: %s", err)
+		}
+		close(ch)
+	}()
+
+	var gotVarPb dto.Metric
+	gotPb := &gotVarPb
+
+	gotHistogram := <-ch
+	if err := gotHistogram.Write(gotPb); err != nil {
+		t.Errorf("Error during encoding the Metric into a \"Metric\" Protocol Buffer data transmission object: %s", err)
+	}
+
+	expectedCounts := map[float64]uint64{
+		.1:          2,
+		.5:          3,
+		1:           4,
+		5:           6,
+		10:          8,
+		50:          12,
+		100:         13,
+		500:         18,
+		1000:        20,
+		5000:        21,
+		10000:       21,
+		math.Inf(1): 22,
+	}
+
+	expectedHistogram := prometheus.MustNewConstHistogram(prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "mysql_command_counter", "latency_milliseconds"),
+		"histogram over a commands latency in ms",
+		[]string{},
+		nil,
+	), 30, 2400, expectedCounts)
+
+	var expectedVarPb dto.Metric
+	expectedPb := &expectedVarPb
+	if err := expectedHistogram.Write(expectedPb); err != nil {
+		t.Errorf("Error during encoding the Metric into a \"Metric\" Protocol Buffer data transmission object: %s", err)
+	}
+
+	convey.Convey("Histogram comparison", t, func() {
+		convey.So(expectedPb.Histogram, convey.ShouldResemble, gotPb.Histogram)
+	})
+
+	// Ensure all SQL queries were executed
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
 }
 
 func TestScrapeMySQLConnectionPool(t *testing.T) {
@@ -515,7 +587,7 @@ func TestExporter(t *testing.T) {
 	}
 
 	// wait up to 30 seconds for ProxySQL to become available
-	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true, true, true)
+	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true, true, true, true)
 	for i := 0; i < 30; i++ {
 		db, err := exporter.db()
 		if err != nil {
