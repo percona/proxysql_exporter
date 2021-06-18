@@ -705,7 +705,7 @@ func TestExporter(t *testing.T) {
 	}
 
 	// wait up to 30 seconds for ProxySQL to become available
-	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true, true, true, true)
+	exporter := NewExporter("admin:admin@tcp(127.0.0.1:16032)/", true, true, true, true, true, true, true)
 	for i := 0; i < 30; i++ {
 		db, err := exporter.db()
 		if err != nil {
