@@ -72,5 +72,5 @@ func main() {
 		*memoryMetricsF, *mysqlCommandCounter)
 	prometheus.MustRegister(exporter)
 
-	exporter_shared.RunServer("ProxySQL", *listenAddressF, *telemetryPathF, promhttp.ContinueOnError)
+	exporter_shared.RunServer("ProxySQL", *listenAddressF, *telemetryPathF, promhttp.Handler())
 }
