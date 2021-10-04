@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.1.2
+PMM-8091 Collect from runtime_mysql_servers (#54)
+PMM-7902 Remove Go 1.15 (#56) 
+
 ## v1.1.0 (2017-07-07)
 
 * Add all varaibles from `stats_mysql_global`.
