@@ -684,7 +684,7 @@ func scrapeMySQLMostFrequentQueries(db *sql.DB, ch chan<- prometheus.Metric) err
 }
 
 // Get longest running queries
-const mysqlLongestRunningQueriesQuery = `SELECT hostgroup, username, digest, digest_text as query, sum_time as total_time
+const mysqlLongestRunningQueriesQuery = `SELECT hostgroup, username, digest, digest_text as query, sum_time as total_time, FROM_UNIXTIME(first_seen) AS first_seen, sum_rows_sent AS rows_sent
 										FROM stats_mysql_query_digest
 										ORDER BY total_time desc
 										LIMIT 25`
@@ -695,7 +695,7 @@ var mysqlLongestRunningQueriesMetrics = map[string]*metric{
 }
 
 type longestRunningQueriesResult struct {
-	hostgroup, username, digest, query string
+	hostgroup, username, digest, query, first_seen, rows_sent string
 	totalTime                          float64
 }
 
@@ -709,7 +709,7 @@ func scrapeMySQLLongestRunningQueries(db *sql.DB, ch chan<- prometheus.Metric) e
 	for rows.Next() {
 		var res longestRunningQueriesResult
 
-		err := rows.Scan(&res.hostgroup, &res.username, &res.digest, &res.query, &res.totalTime)
+		err := rows.Scan(&res.hostgroup, &res.username, &res.digest, &res.query, &res.totalTime, &res.first_seen, &res.rows_sent)
 		if err != nil {
 			return err
 		}
@@ -720,12 +720,12 @@ func scrapeMySQLLongestRunningQueries(db *sql.DB, ch chan<- prometheus.Metric) e
 			prometheus.NewDesc(
 				prometheus.BuildFQName(namespace, "queries", m.name),
 				m.help,
-				[]string{"hostgroup", "username", "digest", "query"},
+				[]string{"hostgroup", "username", "digest", "query", "first_seen", "rows_sent"},
 				nil,
 			),
 			m.valueType,
 			res.totalTime,
-			res.hostgroup, res.username, res.digest, res.query,
+			res.hostgroup, res.username, res.digest, res.query, res.first_seen, res.rows_sent,
 		)
 	}
 
