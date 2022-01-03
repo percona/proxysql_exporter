@@ -8,7 +8,7 @@ jobs:
     strategy:
       matrix:
         go-version:
-          - 1.16
+          - 1.17
         proxysql-image:
           - percona/proxysql:1.2.1
           - perconalab/proxysql:1.3.6
