@@ -44,6 +44,8 @@ var (
 	mysqlCommandCounter          = flag.Bool("collect.stats_command_counter", false, "Collect histograms over command latency")
 	mysqlRuntimeServers          = flag.Bool("collect.runtime_mysql_servers", false, "Collect from runtime_mysql_servers.")
 	memoryMetricsF               = flag.Bool("collect.stats_memory_metrics", false, "Collect memory metrics from stats_memory_metrics.")
+
+	logLevel = flag.String("log.level", "", "Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]")
 )
 
 func main() {
@@ -60,6 +62,15 @@ func main() {
 	if *versionF {
 		fmt.Println(version.Print(program))
 		os.Exit(0)
+	}
+
+	if *logLevel != "" {
+		err := log.Base().SetLevel(*logLevel)
+
+		if err != nil {
+			log.Errorf("error: not a valid logrus Level: %q, try --help", *logLevel)
+			os.Exit(0)
+		}
 	}
 
 	dsn := os.Getenv("DATA_SOURCE_NAME")
