@@ -215,7 +215,7 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 		}
 	}
 
-	if err = scrapeProxySqlInfo(db, ch); err != nil {
+	if err = scrapeProxySQLInfo(db, ch); err != nil {
 		log.Errorln("Error scraping for collect.proxysql_info", err)
 		e.scrapeErrorsTotal.WithLabelValues("collect.proxysql_info").Inc()
 	}
@@ -775,10 +775,10 @@ func scrapeMemoryMetrics(db *sql.DB, ch chan<- prometheus.Metric) error {
 	return rows.Err()
 }
 
-const proxysqlVersionQuery = "select variable_value from global_variables where variable_name = 'admin-version'"
+const proxySQLVersionQuery = "select variable_value from global_variables where variable_name = 'admin-version'"
 
-func scrapeProxySqlInfo(db *sql.DB, ch chan<- prometheus.Metric) error {
-	rows, err := db.Query(proxysqlVersionQuery)
+func scrapeProxySQLInfo(db *sql.DB, ch chan<- prometheus.Metric) error {
+	rows, err := db.Query(proxySQLVersionQuery)
 	if err != nil {
 		return err
 	}
