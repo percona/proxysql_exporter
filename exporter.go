@@ -794,7 +794,7 @@ func scrapeProxySQLInfo(db *sql.DB, ch chan<- prometheus.Metric) error {
 		ch <- prometheus.MustNewConstMetric(
 			prometheus.NewDesc(
 				prometheus.BuildFQName(namespace, "", "info"),
-				"ProxySQL version",
+				"ProxySQL info",
 				[]string{"version"}, nil,
 			),
 			prometheus.GaugeValue,
