@@ -214,6 +214,11 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 			e.scrapeErrorsTotal.WithLabelValues("collect.stats_command_counter_metrics").Inc()
 		}
 	}
+
+	if err = scrapeProxySQLInfo(db, ch); err != nil {
+		log.Errorln("Error scraping for collect.proxysql_info", err)
+		e.scrapeErrorsTotal.WithLabelValues("collect.proxysql_info").Inc()
+	}
 }
 
 // metric contains information about Prometheus metric.
@@ -767,6 +772,36 @@ func scrapeMemoryMetrics(db *sql.DB, ch chan<- prometheus.Metric) error {
 		)
 	}
 
+	return rows.Err()
+}
+
+const proxySQLVersionQuery = "select variable_value from global_variables where variable_name = 'admin-version'"
+
+func scrapeProxySQLInfo(db *sql.DB, ch chan<- prometheus.Metric) error {
+	rows, err := db.Query(proxySQLVersionQuery)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var version string
+
+		err := rows.Scan(&version)
+		if err != nil {
+			return err
+		}
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc(
+				prometheus.BuildFQName(namespace, "", "info"),
+				"ProxySQL info",
+				[]string{"version"}, nil,
+			),
+			prometheus.GaugeValue,
+			0,
+			version,
+		)
+	}
 	return rows.Err()
 }
 

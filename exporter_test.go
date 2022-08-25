@@ -16,7 +16,6 @@ package main
 
 import (
 	"errors"
-	"github.com/stretchr/testify/assert"
 	"math"
 	"regexp"
 	"strings"
@@ -26,6 +25,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
 	"gopkg.in/DATA-DOG/go-sqlmock.v1"
 )
 
@@ -657,6 +657,43 @@ func TestScrapeMemoryMetrics(t *testing.T) {
 
 	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
 		for _, expect := range counterExpected {
+			got := *readMetric(<-ch)
+			cv.So(got, convey.ShouldResemble, expect)
+		}
+	})
+
+	// Ensure all SQL queries were executed
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+func TestScrapeProxySQLInfo(t *testing.T) { //nolint:paralleltest
+	const proxySQLVersionQueryExpected = "select variable_value from global_variables where variable_name = 'admin-version'"
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("error opening a stub database connection: %s", err)
+	}
+	defer db.Close()
+
+	columns := []string{"Variable_Value"}
+	rows := sqlmock.NewRows(columns).
+		AddRow("2.1")
+	mock.ExpectQuery(sanitizeQuery(proxySQLVersionQueryExpected)).WillReturnRows(rows)
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		if err = scrapeProxySQLInfo(db, ch); err != nil {
+			t.Errorf("error calling function on test: %s", err)
+		}
+		close(ch)
+	}()
+	proxySQLInfoMetricExpected := []metricResult{
+		{"proxysql_info", prometheus.Labels{"version": "2.1"}, 0, dto.MetricType_GAUGE},
+	}
+	convey.Convey("Metrics comparison", t, convey.FailureContinues, func(cv convey.C) {
+		for _, expect := range proxySQLInfoMetricExpected {
 			got := *readMetric(<-ch)
 			cv.So(got, convey.ShouldResemble, expect)
 		}
