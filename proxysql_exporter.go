@@ -67,8 +67,9 @@ func main() {
 		os.Exit(0)
 	}
 
-	promlogConfig := &promlog.Config{Level: &promlog.AllowedLevel{}}
+	promlogConfig := &promlog.Config{}
 	if *logLevel != "" {
+		promlogConfig.Level = &promlog.AllowedLevel{}
 		err := promlogConfig.Level.Set(*logLevel)
 		if err != nil {
 			level.Error(logger).Log("msg", fmt.Sprintf("error: not a valid logrus Level: %q, try --help", *logLevel))
