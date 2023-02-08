@@ -12,7 +12,7 @@ require (
 	github.com/prometheus/common v0.37.0
 	github.com/prometheus/promu v0.12.0
 	github.com/reviewdog/reviewdog v0.14.1
-	github.com/smartystreets/goconvey v1.6.4
+	github.com/smartystreets/goconvey v1.7.2
 	github.com/stretchr/testify v1.8.1
 	gopkg.in/DATA-DOG/go-sqlmock.v1 v1.3.0
 )
@@ -138,7 +138,7 @@ require (
 	github.com/securego/gosec/v2 v2.7.0 // indirect
 	github.com/shazow/go-diff v0.0.0-20160112020656-b6b7b6733b8c // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
-	github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d // indirect
+	github.com/smartystreets/assertions v1.2.0 // indirect
 	github.com/sonatard/noctx v0.0.1 // indirect
 	github.com/sourcegraph/go-diff v0.6.1 // indirect
 	github.com/spf13/afero v1.1.2 // indirect
