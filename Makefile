@@ -20,7 +20,7 @@ PREFIX              ?= $(shell pwd)
 BIN_DIR             ?= $(shell pwd)
 DOCKER_IMAGE_NAME   ?= proxysql-exporter
 DOCKER_IMAGE_TAG    ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
-PKGS         				?= ./...
+PKGS                ?= ./...
 
 # Race detector is only supported on amd64.
 RACE := $(shell test $$(go env GOARCH) != "amd64" || (echo "-race"))
