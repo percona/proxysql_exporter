@@ -15,12 +15,12 @@
 GO           := go
 FIRST_GOPATH := $(firstword $(subst :, ,$(shell $(GO) env GOPATH)))
 PROMU        := bin/promu -v
-pkgs          = $(shell $(GO) list ./... | grep -v /vendor/)
 
 PREFIX              ?= $(shell pwd)
 BIN_DIR             ?= $(shell pwd)
 DOCKER_IMAGE_NAME   ?= proxysql-exporter
 DOCKER_IMAGE_TAG    ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
+PKGS         				?= ./...
 
 # Race detector is only supported on amd64.
 RACE := $(shell test $$(go env GOARCH) != "amd64" || (echo "-race"))
@@ -33,23 +33,23 @@ all: format build test
 
 style:
 	@echo ">> checking code style"
-	@! gofmt -d $(shell find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
+	@! gofmt -d $(shell find . -path ./... -prune -o -name '*.go' -print) | grep '^'
 
 test:
 	@echo ">> running tests"
-	@$(GO) test -v -short $(RACE) -coverprofile coverage.txt $(pkgs)
+	@$(GO) test -v -short $(RACE) -coverprofile coverage.txt $(PKGS)
 
 testall:
 	@echo ">> running all tests"
-	@$(GO) test -v $(RACE) -coverprofile coverage.txt $(pkgs)
+	@$(GO) test -v $(RACE) -coverprofile coverage.txt $(PKGS)
 
 format:
 	@echo ">> formatting code"
-	@$(GO) fmt $(pkgs)
+	@$(GO) fmt $(PKGS)
 
 vet:
 	@echo ">> vetting code"
-	@$(GO) vet $(pkgs)
+	@$(GO) vet $(PKGS)
 
 build: promu
 	@echo ">> building binaries"
