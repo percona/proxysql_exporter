@@ -1,65 +1,60 @@
 name: Go
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+      - pmm-*
+    tags:
+      - v[0-9]+.[0-9]+.[0-9]+*
+
+  pull_request:
 
 jobs:
   test:
     name: Test
     strategy:
       matrix:
-        go-version:
-          - 1.19
         proxysql-image:
           - percona/proxysql:1.2.1
           - perconalab/proxysql:1.3.6
-        include:
-          - go-version: tip
-            os: ubuntu-latest
-            may-fail: true
     runs-on: ubuntu-latest
     steps:
-    - name: Set up Go release
-      if: matrix.go-version != 'tip'
-      uses: percona-platform/setup-go@v2
-      with:
-        go-version: ${{ matrix.go-version }}
-    - name: Set up Go tip
-      if: matrix.go-version == 'tip'
-      env:
-        # to avoid error due to `go version` accepting -v flag with an argument since 1.15
-        GOFLAGS: ""
-      run: |
-        git clone --depth=1 https://go.googlesource.com/go $HOME/gotip
-        cd $HOME/gotip/src
-        ./make.bash
-        echo "GOROOT=$HOME/gotip" >> $GITHUB_ENV
-        echo "$HOME/gotip/bin" >> $GITHUB_PATH
-    - name: Checkout code
-      uses: percona-platform/checkout@v2
-    - name: Build
-      run: make build
-    - name: Run checks
-      run: |
-        go build -modfile=go.mod -o bin/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
-        go build -modfile=go.mod -o bin/reviewdog github.com/reviewdog/reviewdog/cmd/reviewdog
-        bin/golangci-lint run -c=.golangci-required.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-check
-        bin/golangci-lint run -c=.golangci.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-review
-        make format
-        git diff --exit-code
-        make build
-    - name: Run Tests
-      env:
-        PROXYSQL_IMAGE: ${{ matrix.proxysql-image }}
-      run: |
-        docker --version
-        docker-compose --version
-        docker-compose up -d
-        make testall
-    - name: Run debug commands on failure
-      if: ${{ failure() }}
-      run: |
-        env
-        go version
-        go env
-        pwd
-        git status
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: ${{ github.workspace }}/go.mod
+
+      - name: Build
+        run: make build
+
+      - name: Run checks
+        run: |
+          go build -modfile=go.mod -o bin/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
+          go build -modfile=go.mod -o bin/reviewdog github.com/reviewdog/reviewdog/cmd/reviewdog
+          bin/golangci-lint run -c=.golangci-required.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-check
+          bin/golangci-lint run -c=.golangci.yml --out-format=line-number | env REVIEWDOG_GITHUB_API_TOKEN=${{ secrets.GITHUB_TOKEN }} bin/reviewdog -f=golangci-lint -level=error -reporter=github-pr-review
+          make format
+          git diff --exit-code
+          make build
+
+      - name: Run Tests
+        env:
+          PROXYSQL_IMAGE: ${{ matrix.proxysql-image }}
+        run: |
+          docker --version
+          docker-compose --version
+          docker-compose up -d
+          make testall
+
+      - name: Run debug commands on failure
+        if: ${{ failure() }}
+        run: |
+          env
+          go version
+          go env
+          pwd
+          git status
