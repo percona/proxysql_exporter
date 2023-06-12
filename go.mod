@@ -8,7 +8,7 @@ require (
 	github.com/golangci/golangci-lint v1.53.2
 	github.com/percona/exporter_shared v0.7.4
 	github.com/prometheus/client_golang v1.14.0
-	github.com/prometheus/client_model v0.3.0
+	github.com/prometheus/client_model v0.4.0
 	github.com/prometheus/common v0.37.0
 	github.com/prometheus/promu v0.14.0
 	github.com/reviewdog/reviewdog v0.14.1
@@ -218,7 +218,7 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220519153652-3a47de7e79bd // indirect
 	google.golang.org/grpc v1.46.2 // indirect
-	google.golang.org/protobuf v1.28.1 // indirect
+	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
