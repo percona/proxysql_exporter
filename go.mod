@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/go-kit/log v0.2.1
-	github.com/go-sql-driver/mysql v1.7.0
+	github.com/go-sql-driver/mysql v1.7.1
 	github.com/golangci/golangci-lint v1.53.2
 	github.com/percona/exporter_shared v0.7.4
 	github.com/prometheus/client_golang v1.14.0
