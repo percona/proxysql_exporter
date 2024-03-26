@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/go-kit/log v0.2.1
-	github.com/go-sql-driver/mysql v1.7.0
+	github.com/go-sql-driver/mysql v1.8.0
 	github.com/golangci/golangci-lint v1.53.2
 	github.com/percona/exporter_shared v0.7.4
 	github.com/prometheus/client_golang v1.14.0
@@ -24,6 +24,7 @@ require (
 	cloud.google.com/go/compute v1.19.1 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/datastore v1.11.0 // indirect
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/4meepo/tagalign v1.2.2 // indirect
 	github.com/Abirdcfly/dupword v0.0.11 // indirect
 	github.com/Antonboom/errname v0.1.10 // indirect
