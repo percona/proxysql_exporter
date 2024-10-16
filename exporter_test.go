@@ -789,7 +789,7 @@ SAVE MYSQL USERS TO DISK;
 		}
 
 		cv.So(descs, convey.ShouldContainKey,
-			`Desc{fqName: "proxysql_connection_pool_latency_us", help: "The currently ping time in microseconds, as reported from Monitor.", constLabels: {}, variableLabels: [hostgroup endpoint]}`)
+			`Desc{fqName: "proxysql_connection_pool_latency_us", help: "The currently ping time in microseconds, as reported from Monitor.", constLabels: {}, variableLabels: {hostgroup,endpoint}}`)
 	})
 
 	convey.Convey("Metrics data", t, convey.FailureContinues, func(cv convey.C) {
