@@ -46,8 +46,8 @@ jobs:
           PROXYSQL_IMAGE: ${{ matrix.proxysql-image }}
         run: |
           docker --version
-          docker-compose --version
-          docker-compose up -d
+          docker compose --version
+          docker compose up -d
           make testall
 
       - name: Run debug commands on failure
