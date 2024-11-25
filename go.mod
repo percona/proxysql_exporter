@@ -13,7 +13,7 @@ require (
 	github.com/prometheus/promu v0.17.0
 	github.com/reviewdog/reviewdog v0.20.2
 	github.com/smartystreets/goconvey v1.8.1
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	gopkg.in/DATA-DOG/go-sqlmock.v1 v1.3.0
 )
 
