@@ -4,7 +4,7 @@ go 1.23
 
 require (
 	github.com/go-kit/log v0.2.1
-	github.com/go-sql-driver/mysql v1.8.1
+	github.com/go-sql-driver/mysql v1.9.1
 	github.com/golangci/golangci-lint v1.63.4
 	github.com/percona/exporter_shared v0.7.6
 	github.com/prometheus/client_golang v1.20.5
