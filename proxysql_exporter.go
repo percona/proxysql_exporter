@@ -47,7 +47,7 @@ var (
 	memoryMetricsF               = flag.Bool("collect.stats_memory_metrics", false, "Collect memory metrics from stats_memory_metrics.")
 
 	logLevel = flag.String("log.level", "", "Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]")
-	logger   *slog.Logger
+	logger   *slog.Logger //nolint:gochecknoglobals
 )
 
 func main() {
@@ -66,7 +66,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	promlogConfig := &promslog.Config{}
+	promlogConfig := &promslog.Config{} //nolint:exhaustivestruct
 	if *logLevel != "" {
 		promlogConfig.Level = &promslog.Level{}
 		err := promlogConfig.Level.Set(*logLevel)
@@ -75,6 +75,7 @@ func main() {
 			os.Exit(1)
 		}
 	}
+
 	logger = promslog.New(promlogConfig)
 
 	dsn := os.Getenv("DATA_SOURCE_NAME")

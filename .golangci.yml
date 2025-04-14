@@ -10,6 +10,9 @@ linters-settings:
   unparam:
     check-exported: true
 
+  depguard:
+    list-type: blacklist
+
 linters:
   enable-all: true
 
