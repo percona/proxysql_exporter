@@ -66,7 +66,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	promlogConfig := &promslog.Config{} //nolint:exhaustivestruct
+	promlogConfig := &promslog.Config{} //nolint:exhaustivestruct,exhaustruct
 	if *logLevel != "" {
 		promlogConfig.Level = &promslog.Level{}
 		err := promlogConfig.Level.Set(*logLevel)
