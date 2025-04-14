@@ -47,7 +47,7 @@ var (
 	memoryMetricsF               = flag.Bool("collect.stats_memory_metrics", false, "Collect memory metrics from stats_memory_metrics.")
 
 	logLevel = flag.String("log.level", "", "Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]")
-	logger   *slog.Logger //nolint:gochecknoglobals
+	logger   = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{})) //nolint:gochecknoglobals
 )
 
 func main() {
