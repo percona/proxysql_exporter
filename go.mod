@@ -9,7 +9,7 @@ require (
 	github.com/golangci/golangci-lint v1.63.4
 	github.com/percona/exporter_shared v0.7.6
 	github.com/prometheus/client_golang v1.20.5
-	github.com/prometheus/client_model v0.6.1
+	github.com/prometheus/client_model v0.6.2
 	github.com/prometheus/common v0.61.0
 	github.com/prometheus/promu v0.17.0
 	github.com/reviewdog/reviewdog v0.20.3
@@ -222,7 +222,7 @@ require (
 	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/time v0.7.0 // indirect
 	golang.org/x/tools v0.28.0 // indirect
-	google.golang.org/protobuf v1.35.2 // indirect
+	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
