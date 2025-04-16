@@ -16,7 +16,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"regexp"
 	"strings"
@@ -812,7 +811,6 @@ SAVE MYSQL USERS TO DISK;
 			for k := range m.labels {
 				cv.So(k, convey.ShouldEqual, strings.ToLower(k))
 			}
-			fmt.Println(m)
 		}
 
 		cv.So(metricResult{"proxysql_connection_pool_latency_us", prometheus.Labels{"hostgroup": "1", "endpoint": "mysql:3306"}, 0, dto.MetricType_GAUGE},
