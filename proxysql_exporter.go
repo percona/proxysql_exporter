@@ -17,15 +17,14 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/go-kit/log/level"
+	"log/slog"
 	"os"
 
-	"github.com/go-kit/log"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/percona/exporter_shared"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/promlog"
+	"github.com/prometheus/common/promslog"
 	"github.com/prometheus/common/version"
 )
 
@@ -48,7 +47,7 @@ var (
 	memoryMetricsF               = flag.Bool("collect.stats_memory_metrics", false, "Collect memory metrics from stats_memory_metrics.")
 
 	logLevel = flag.String("log.level", "", "Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]")
-	logger   = log.NewNopLogger()
+	logger   = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{})) //nolint:gochecknoglobals,exhaustruct
 )
 
 func main() {
@@ -67,23 +66,24 @@ func main() {
 		os.Exit(0)
 	}
 
-	promlogConfig := &promlog.Config{}
+	promlogConfig := &promslog.Config{} //nolint:exhaustivestruct,exhaustruct
 	if *logLevel != "" {
-		promlogConfig.Level = &promlog.AllowedLevel{}
+		promlogConfig.Level = &promslog.Level{}
 		err := promlogConfig.Level.Set(*logLevel)
 		if err != nil {
-			level.Error(logger).Log("msg", fmt.Sprintf("error: not a valid logrus Level: %q, try --help", *logLevel))
+			logger.Error(fmt.Sprintf("error: not a valid logrus Level: %q, try --help", *logLevel))
 			os.Exit(1)
 		}
 	}
-	logger = promlog.New(promlogConfig)
+
+	logger = promslog.New(promlogConfig)
 
 	dsn := os.Getenv("DATA_SOURCE_NAME")
 	if dsn == "" {
 		dsn = defaultDataSource
 	}
 
-	level.Info(logger).Log("msg", fmt.Sprintf("Starting %s %s for %s", program, version.Version, dsn))
+	logger.Info(fmt.Sprintf("Starting %s %s for %s", program, version.Version, dsn))
 
 	exporter := NewExporter(dsn, *mysqlStatusF, *mysqlConnectionPoolF, *mysqlConnectionListF, *mysqlDetailedConnectionListF,
 		*mysqlRuntimeServers, *memoryMetricsF, *mysqlCommandCounter)

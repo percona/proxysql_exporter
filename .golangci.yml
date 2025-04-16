@@ -12,6 +12,8 @@ linters-settings:
 
 linters:
   enable-all: true
+  disable:
+    - depguard
 
 issues:
   exclude-use-default: false

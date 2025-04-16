@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -167,7 +166,7 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 		defer db.Close()
 	}
 	if err != nil {
-		level.Error(logger).Log("msg", "Error opening connection to ProxySQL:", err)
+		logger.Error("Error opening connection to ProxySQL", "error", err)
 		e.proxysqlUp.Set(0)
 		return
 	}
@@ -175,49 +174,49 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 
 	if e.scrapeMySQLGlobal {
 		if err = scrapeMySQLGlobal(db, ch); err != nil {
-			level.Error(logger).Log("msg", "Error scraping for collect.mysql_status:", err)
+			logger.Error("Error scraping for collect.mysql_status:", "error", err)
 			e.scrapeErrorsTotal.WithLabelValues("collect.mysql_status").Inc()
 		}
 	}
 	if e.scrapeMySQLConnectionPool {
 		if err = scrapeMySQLConnectionPool(db, ch); err != nil {
-			level.Error(logger).Log("msg", "Error scraping for collect.mysql_connection_pool:", err)
+			logger.Error("Error scraping for collect.mysql_connection_pool:", "error", err)
 			e.scrapeErrorsTotal.WithLabelValues("collect.mysql_connection_pool").Inc()
 		}
 	}
 	if e.scrapeMySQLConnectionList {
 		if err = scrapeMySQLConnectionList(db, ch); err != nil {
-			level.Error(logger).Log("msg", "Error scraping for collect.mysql_connection_list:", err)
+			logger.Error("Error scraping for collect.mysql_connection_list:", "error", err)
 			e.scrapeErrorsTotal.WithLabelValues("collect.mysql_connection_list").Inc()
 		}
 	}
 	if e.scrapeDetailedMySQLProcessList {
 		if err = scrapeDetailedMySQLConnectionList(db, ch); err != nil {
-			level.Error(logger).Log("msg", "Error scraping for collect.stats_mysql_processlist", err)
+			logger.Error("Error scraping for collect.stats_mysql_processlist", "error", err)
 			e.scrapeErrorsTotal.WithLabelValues("collect.stats_mysql_processlist").Inc()
 		}
 	}
 	if e.scrapeMySQLRuntimeServers {
 		if err = scrapeMySQLRuntimeServers(db, ch); err != nil {
-			level.Error(logger).Log("msg", "Error scraping for collect.runtime_mysql_servers", err)
+			logger.Error("Error scraping for collect.runtime_mysql_servers", "error", err)
 			e.scrapeErrorsTotal.WithLabelValues("collect.runtime_mysql_servers").Inc()
 		}
 	}
 	if e.scrapeMemoryMetrics {
 		if err = scrapeMemoryMetrics(db, ch); err != nil {
-			level.Error(logger).Log("msg", "Error scraping for collect.stats_memory_metrics", err)
+			logger.Error("Error scraping for collect.stats_memory_metrics", "error", err)
 			e.scrapeErrorsTotal.WithLabelValues("collect.stats_memory_metrics").Inc()
 		}
 	}
 	if e.scrapeMySQLCommandCounterMetrics {
 		if err = scrapeMySQLCommandCounterMetrics(db, ch); err != nil {
-			level.Error(logger).Log("msg", "Error scraping for collect.stats_command_counter_metrics", err)
+			logger.Error("Error scraping for collect.stats_command_counter_metrics", "error", err)
 			e.scrapeErrorsTotal.WithLabelValues("collect.stats_command_counter_metrics").Inc()
 		}
 	}
 
 	if err = scrapeProxySQLInfo(db, ch); err != nil {
-		level.Error(logger).Log("msg", "Error scraping for collect.proxysql_info", err)
+		logger.Error("Error scraping for collect.proxysql_info", "error", err)
 		e.scrapeErrorsTotal.WithLabelValues("collect.proxysql_info").Inc()
 	}
 }
@@ -267,7 +266,7 @@ func scrapeMySQLGlobal(db *sql.DB, ch chan<- prometheus.Metric) error {
 		}
 		value, err := strconv.ParseFloat(valueS, 64)
 		if err != nil {
-			level.Debug(logger).Log("msg", fmt.Sprintf("variable %s: %s", name, err))
+			logger.Debug(fmt.Sprintf("variable %s: %s", name, err))
 			continue
 		}
 
@@ -376,7 +375,7 @@ func scrapeMySQLConnectionPool(db *sql.DB, ch chan<- prometheus.Metric) error {
 				// For now, we assume every other value is a float.
 				value, err = strconv.ParseFloat(valueS, 64)
 				if err != nil {
-					level.Debug(logger).Log("msg", fmt.Sprintf("column %s: %s", column, err))
+					logger.Debug(fmt.Sprintf("column %s: %s", column, err))
 					continue
 				}
 			}
@@ -662,7 +661,7 @@ func scrapeMySQLRuntimeServers(db *sql.DB, ch chan<- prometheus.Metric) error {
 				// For now, we assume every other value is a float.
 				value, err = strconv.ParseFloat(valueS, 64)
 				if err != nil {
-					level.Debug(logger).Log("msg", fmt.Sprintf("column %s: %s", column, err))
+					logger.Debug(fmt.Sprintf("column %s: %s", column, err))
 					continue
 				}
 			}
