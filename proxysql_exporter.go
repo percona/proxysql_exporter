@@ -46,7 +46,7 @@ var (
 	mysqlRuntimeServers          = flag.Bool("collect.runtime_mysql_servers", false, "Collect from runtime_mysql_servers.")
 	memoryMetricsF               = flag.Bool("collect.stats_memory_metrics", false, "Collect memory metrics from stats_memory_metrics.")
 
-	logLevel = flag.String("log.level", "", "Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal]")
+	logLevel = flag.String("log.level", "error", "Only log messages with the given severity or above. Valid levels: [debug, info, warn, error]")
 	logger   = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{})) //nolint:gochecknoglobals,exhaustruct
 )
 
@@ -68,10 +68,10 @@ func main() {
 
 	promlogConfig := &promslog.Config{} //nolint:exhaustivestruct,exhaustruct
 	if *logLevel != "" {
-		promlogConfig.Level = &promslog.Level{}
+		promlogConfig.Level = promslog.NewLevel()
 		err := promlogConfig.Level.Set(*logLevel)
 		if err != nil {
-			logger.Error(fmt.Sprintf("error: not a valid logrus Level: %q, try --help", *logLevel))
+			logger.Error(fmt.Sprintf("error: not a valid Level: %q, try --help", *logLevel))
 			os.Exit(1)
 		}
 	}
