@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.24.1
 
 require (
-	github.com/go-sql-driver/mysql v1.9.2
+	github.com/go-sql-driver/mysql v1.9.3
 	github.com/golangci/golangci-lint v1.64.8
 	github.com/percona/exporter_shared v0.7.6
 	github.com/prometheus/client_golang v1.22.0
