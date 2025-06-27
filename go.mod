@@ -10,7 +10,7 @@ require (
 	github.com/percona/exporter_shared v0.7.6
 	github.com/prometheus/client_golang v1.22.0
 	github.com/prometheus/client_model v0.6.2
-	github.com/prometheus/common v0.64.0
+	github.com/prometheus/common v0.65.0
 	github.com/prometheus/promu v0.18.0
 	github.com/reviewdog/reviewdog v0.20.3
 	github.com/smartystreets/goconvey v1.8.1
