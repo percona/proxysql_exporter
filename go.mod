@@ -14,7 +14,7 @@ require (
 	github.com/prometheus/promu v0.18.0
 	github.com/reviewdog/reviewdog v0.20.3
 	github.com/smartystreets/goconvey v1.8.1
-	github.com/stretchr/testify v1.11.0
+	github.com/stretchr/testify v1.11.1
 	gopkg.in/DATA-DOG/go-sqlmock.v1 v1.3.0
 )
 
