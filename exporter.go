@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -198,8 +200,14 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 	}
 	if e.scrapeMySQLRuntimeServers {
 		if err = scrapeMySQLRuntimeServers(db, ch); err != nil {
-			logger.Error("Error scraping for collect.runtime_mysql_servers", "error", err)
-			e.scrapeErrorsTotal.WithLabelValues("collect.runtime_mysql_servers").Inc()
+			// Permission errors (missing admin rights) for runtime metrics are logged only at debug level.
+			// If permissions are insufficient, runtime metrics collection is skipped and no error is reported.
+			if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1045 {
+				logger.Debug("Error scraping for collect.runtime_mysql_servers", "error", err)
+			} else {
+				logger.Error("Error scraping for collect.runtime_mysql_servers", "error", err)
+				e.scrapeErrorsTotal.WithLabelValues("collect.runtime_mysql_servers").Inc()
+			}
 		}
 	}
 	if e.scrapeMemoryMetrics {
