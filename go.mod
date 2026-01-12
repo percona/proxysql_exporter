@@ -27,7 +27,7 @@ require (
 	github.com/Abirdcfly/dupword v0.1.7 // indirect
 	github.com/Antonboom/errname v1.1.1 // indirect
 	github.com/Antonboom/nilnil v1.1.1 // indirect
-	github.com/Antonboom/testifylint v1.5.2 // indirect
+	github.com/Antonboom/testifylint v1.6.4 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/Crocmagnon/fatcontext v0.7.2 // indirect
 	github.com/Djarvur/go-err113 v0.1.1 // indirect
@@ -37,8 +37,8 @@ require (
 	github.com/alecthomas/go-check-sumtype v0.3.1 // indirect
 	github.com/alecthomas/kingpin/v2 v2.4.0 // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
-	github.com/alexkohler/nakedret/v2 v2.0.5 // indirect
-	github.com/alexkohler/prealloc v1.0.0 // indirect
+	github.com/alexkohler/nakedret/v2 v2.0.6 // indirect
+	github.com/alexkohler/prealloc v1.0.2 // indirect
 	github.com/alfatraining/structtag v1.0.0 // indirect
 	github.com/alingse/asasalint v0.0.11 // indirect
 	github.com/alingse/nilnesserr v0.2.0 // indirect
@@ -61,7 +61,7 @@ require (
 	github.com/daixiang0/gci v0.13.7 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/davidmz/go-pageant v1.0.2 // indirect
-	github.com/denis-tingaikin/go-header v0.5.0 // indirect
+	github.com/denis-tingaikin/go-header v1.0.0 // indirect
 	github.com/ettle/strcase v0.2.0 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fatih/structtag v1.2.0 // indirect
@@ -88,7 +88,7 @@ require (
 	github.com/golangci/misspell v0.7.0 // indirect
 	github.com/golangci/plugin-module-register v0.1.2 // indirect
 	github.com/golangci/revgrep v0.8.0 // indirect
-	github.com/golangci/unconvert v0.0.0-20240309020433-c5143eacb3ed // indirect
+	github.com/golangci/unconvert v0.0.0-20250410112200-a129a6e6413e // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-github/v25 v25.1.3 // indirect
 	github.com/google/go-github/v74 v74.0.0 // indirect
@@ -108,7 +108,7 @@ require (
 	github.com/haya14busa/go-sarif v0.0.0-20240630170108-a3ba8d79599f // indirect
 	github.com/hexops/gotextdiff v1.0.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/jgautheron/goconst v1.7.1 // indirect
+	github.com/jgautheron/goconst v1.8.2 // indirect
 	github.com/jingyugao/rowserrcheck v1.1.1 // indirect
 	github.com/jjti/go-spancheck v0.6.5 // indirect
 	github.com/jtolds/gls v4.20.0+incompatible // indirect
@@ -142,7 +142,7 @@ require (
 	github.com/nunnatsa/ginkgolinter v0.19.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/polyfloyd/go-errorlint v1.7.1 // indirect
+	github.com/polyfloyd/go-errorlint v1.8.0 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/quasilyte/go-ruleguard v0.4.5 // indirect
 	github.com/quasilyte/go-ruleguard/dsl v0.3.23 // indirect
@@ -193,9 +193,9 @@ require (
 	github.com/yeya24/promlinter v0.3.0 // indirect
 	github.com/ykadowak/zerologlint v0.1.5 // indirect
 	gitlab.com/bosi/decorder v0.4.2 // indirect
-	gitlab.com/gitlab-org/api/client-go v1.12.0 // indirect
+	gitlab.com/gitlab-org/api/client-go v0.142.6 // indirect
 	go-simpler.org/musttag v0.14.0 // indirect
-	go-simpler.org/sloglint v0.9.0 // indirect
+	go-simpler.org/sloglint v0.11.1 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
