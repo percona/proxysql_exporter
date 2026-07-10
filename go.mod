@@ -3,7 +3,7 @@ module github.com/percona/proxysql_exporter
 go 1.25.8
 
 require (
-	github.com/go-sql-driver/mysql v1.9.3
+	github.com/go-sql-driver/mysql v1.10.0
 	github.com/golangci/golangci-lint v1.64.8
 	github.com/percona/exporter_shared v0.7.6
 	github.com/prometheus/client_golang v1.23.2
@@ -21,7 +21,7 @@ require (
 	4d63.com/gochecknoglobals v0.2.2 // indirect
 	code.gitea.io/sdk/gitea v0.22.1 // indirect
 	codeberg.org/chavacava/garif v0.2.0 // indirect
-	filippo.io/edwards25519 v1.1.1 // indirect
+	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/42wim/httpsig v1.2.3 // indirect
 	github.com/4meepo/tagalign v1.4.3 // indirect
 	github.com/Abirdcfly/dupword v0.1.7 // indirect
