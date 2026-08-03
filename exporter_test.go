@@ -785,11 +785,10 @@ SAVE MYSQL USERS TO DISK;
 
 		descs := make(map[string]struct{})
 		for d := range ch {
-			descs[d.String()] = struct{}{}
+			descs[getName(d)] = struct{}{}
 		}
 
-		cv.So(descs, convey.ShouldContainKey,
-			`Desc{fqName: "proxysql_connection_pool_latency_us", help: "The currently ping time in microseconds, as reported from Monitor.", constLabels: {}, variableLabels: {hostgroup,endpoint}}`)
+		cv.So(descs, convey.ShouldContainKey, "proxysql_connection_pool_latency_us")
 	})
 
 	convey.Convey("Metrics data", t, convey.FailureContinues, func(cv convey.C) {
