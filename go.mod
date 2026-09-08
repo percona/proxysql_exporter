@@ -7,7 +7,7 @@ require (
 	github.com/golangci/golangci-lint v1.64.8
 	github.com/percona/exporter_shared v0.7.6
 	github.com/prometheus/client_golang v1.24.1
-	github.com/prometheus/client_model v0.6.2
+	github.com/prometheus/client_model v0.6.3
 	github.com/prometheus/common v0.71.0
 	github.com/prometheus/promu v0.20.0
 	github.com/reviewdog/reviewdog v0.21.0
