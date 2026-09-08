@@ -3,7 +3,7 @@ module github.com/percona/proxysql_exporter
 go 1.25.8
 
 require (
-	github.com/go-sql-driver/mysql v1.10.0
+	github.com/go-sql-driver/mysql v1.10.1
 	github.com/golangci/golangci-lint v1.64.8
 	github.com/percona/exporter_shared v0.7.6
 	github.com/prometheus/client_golang v1.24.1
