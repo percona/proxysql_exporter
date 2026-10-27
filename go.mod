@@ -8,7 +8,7 @@ require (
 	github.com/percona/exporter_shared v0.7.6
 	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/client_model v0.6.3
-	github.com/prometheus/common v0.72.0
+	github.com/prometheus/common v0.72.1
 	github.com/prometheus/promu v0.20.0
 	github.com/reviewdog/reviewdog v0.21.2
 	github.com/smartystreets/goconvey v1.8.1
@@ -203,11 +203,11 @@ require (
 	golang.org/x/exp/typeparams v0.0.0-20251219203646-944ab1f22d93 // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
-	golang.org/x/sync v0.23.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
-	golang.org/x/tools v0.50.0 // indirect
+	golang.org/x/tools v0.51.0 // indirect
 	golang.org/x/tools/go/expect v0.1.1-deprecated // indirect
 	golang.org/x/tools/go/packages/packagestest v0.1.1-deprecated // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
