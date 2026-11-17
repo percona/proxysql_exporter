@@ -33,7 +33,7 @@ archives:
     files:
       - LICENSE
 snapshot:
-  version_template: "{{ .ShortCommit }}"
+  version_template: "{{ incpatch .Version }}-snapshot.{{ .ShortCommit }}"
 checksum:
   name_template: "{{ .ProjectName }}-{{ .Version }}.checksums.txt"
 changelog:
