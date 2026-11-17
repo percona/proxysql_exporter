@@ -1,0 +1,83 @@
+version: 2
+dist: build
+builds:
+  - binary: proxysql_exporter
+    id: proxysql_exporter
+    main: .
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm
+      - arm64
+    goarm:
+      - 7
+    ignore:
+      - goos: darwin
+        goarch: arm
+    flags:
+      - -v
+    ldflags:
+      - -s -w
+      - -X github.com/prometheus/common/version.Version={{.Version}}
+      - -X github.com/prometheus/common/version.Revision={{.ShortCommit}}
+      - -X github.com/prometheus/common/version.Branch={{.Branch}}
+      - -X github.com/prometheus/common/version.BuildUser=goreleaser
+      - -X github.com/prometheus/common/version.BuildDate={{.Date}}
+archives:
+  - name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{ .Arch }}"
+    wrap_in_directory: true
+    files:
+      - LICENSE
+snapshot:
+  version_template: "{{ .ShortCommit }}"
+checksum:
+  name_template: "{{ .ProjectName }}-{{ .Version }}.checksums.txt"
+changelog:
+  use: github
+release:
+  github:
+    owner: percona
+    name: proxysql_exporter
+  draft: true
+  prerelease: auto
+dockers_v2:
+  - ids:
+      - proxysql_exporter
+    images:
+      - docker.io/percona/proxysql_exporter
+      - ghcr.io/percona/proxysql_exporter
+    tags:
+      - "{{.Major}}.{{.Minor}}"
+      - "{{.Version}}"
+    dockerfile: .scripts/Dockerfile
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    flags:
+      - "--pull"
+nfpms:
+  - file_name_template: "{{ .ProjectName }}-{{ .Version }}.{{ .Os }}-{{- if eq .Arch `amd64` }}64-bit{{- else }}{{ .Arch }}{{ end }}"
+    homepage: https://www.percona.com/
+    description: Prometheus exporter for ProxySQL metrics
+    maintainer: Percona
+    vendor: Percona
+    license: Apache 2.0
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    scripts:
+      postinstall: .scripts/postinst
+      preremove: .scripts/preremove
+      postremove: .scripts/postremove
+    contents:
+      - src: .scripts/systemd/proxysql_exporter.service
+        dst: /usr/lib/systemd/system/proxysql_exporter.service
+      - src: .scripts/default/proxysql_exporter.example
+        dst: /etc/default/proxysql_exporter.example
+      - src: LICENSE
+        dst: /usr/share/doc/proxysql_exporter/LICENSE
