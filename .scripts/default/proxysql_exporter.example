@@ -1,0 +1,6 @@
+# Copy to /etc/default/proxysql_exporter (mode 0640, group proxysql_exporter) and adjust.
+# Full list of options: proxysql_exporter --help, or https://github.com/percona/proxysql_exporter
+
+DATA_SOURCE_NAME="stats:stats@tcp(127.0.0.1:6032)/"
+
+OPTIONS="--web.listen-address=:42004"

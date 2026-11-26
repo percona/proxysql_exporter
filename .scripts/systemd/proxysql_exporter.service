@@ -1,0 +1,18 @@
+[Unit]
+Description=Prometheus exporter for ProxySQL metrics
+Documentation=https://github.com/percona/proxysql_exporter
+After=network.target
+
+[Service]
+Type=simple
+
+User=proxysql_exporter
+
+EnvironmentFile=-/etc/default/proxysql_exporter
+ExecStart=/usr/bin/proxysql_exporter $OPTIONS
+SyslogIdentifier=proxysql_exporter
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
